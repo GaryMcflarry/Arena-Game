@@ -1,7 +1,6 @@
 import pygame
 import math
 from typing import List, Tuple
-from constants import LIGHT_BLUE, BossType
 from constants import *
 
 class RayCaster:
@@ -41,36 +40,40 @@ class RayCaster:
         return rays
 
     def render_3d_town(self, rays: List[Tuple[float, float, int]], player):
-        """Render 3D town view"""
+        """Render 3D town view with variable building heights"""
         # Jump effect - modify view height based on player z position
         view_bob = int(player.z * 0.3)
         
-        # Draw sky (lighter for outdoor town feel)
-        sky_rect = (0, 0 + view_bob, SCREEN_WIDTH, SCREEN_HEIGHT // 2)
-        pygame.draw.rect(self.screen, LIGHT_BLUE, sky_rect)
+        # Draw sky with gradient effect
+        self.render_sky_gradient(view_bob)
         
-        # Draw ground (cobblestone-like)
-        ground_rect = (0, SCREEN_HEIGHT // 2 + view_bob, SCREEN_WIDTH, SCREEN_HEIGHT // 2)
-        pygame.draw.rect(self.screen, GRAY, ground_rect)
+        # Draw textured ground
+        self.render_town_ground(view_bob)
 
-        # Draw walls with different textures based on building type
+        # Draw walls with different heights and textures based on building type
         for i, (depth, ray_angle, wall_type) in enumerate(rays):
-            wall_height = 21000 / (depth + 0.0001)
-            
-            # Different building colors based on type
+            # Variable building heights based on type
+            base_height = 21000
             if wall_type == 1:  # Town walls/boundaries
+                wall_height = base_height * 0.8 / (depth + 0.0001)  # Lower walls
                 base_color = BROWN
             elif wall_type == 2:  # Regular houses
+                wall_height = base_height * 1.0 / (depth + 0.0001)  # Normal height
                 base_color = DARK_GRAY
-            elif wall_type == 3:  # Weapon shop
+            elif wall_type == 3:  # Weapon shop (blacksmith)
+                wall_height = base_height * 1.3 / (depth + 0.0001)  # Taller workshop
                 base_color = DARK_RED
-            elif wall_type == 4:  # Magic shop
+            elif wall_type == 4:  # Magic shop (tower)
+                wall_height = base_height * 1.8 / (depth + 0.0001)  # Tall tower
                 base_color = PURPLE
-            elif wall_type == 5:  # Healer
+            elif wall_type == 5:  # Healer (temple)
+                wall_height = base_height * 1.5 / (depth + 0.0001)  # Temple height
                 base_color = WHITE
             elif wall_type == 6:  # Arena entrance
+                wall_height = base_height * 2.0 / (depth + 0.0001)  # Impressive entrance
                 base_color = GOLD
             else:
+                wall_height = base_height / (depth + 0.0001)
                 base_color = GRAY
                 
             # Apply distance shading
@@ -80,11 +83,76 @@ class RayCaster:
             # Apply jump bob to wall rendering
             wall_y = (SCREEN_HEIGHT - wall_height) // 2 + view_bob
             
-            pygame.draw.rect(
-                self.screen,
-                wall_color,
-                (i * 2, wall_y, 2, wall_height)
-            )
+            # Add simple texture effect by varying brightness
+            self.render_textured_wall(i, wall_y, wall_height, wall_color, wall_type, depth)
+
+    def render_sky_gradient(self, view_bob):
+        """Render a gradient sky instead of solid color"""
+        for y in range(SCREEN_HEIGHT // 2):
+            # Create gradient from light blue to white
+            intensity = int(255 * (1 - y / (SCREEN_HEIGHT // 2)))
+            sky_color = (min(255, LIGHT_BLUE[0] + intensity // 3), 
+                        min(255, LIGHT_BLUE[1] + intensity // 2),
+                        min(255, LIGHT_BLUE[2] + intensity // 4))
+            
+            pygame.draw.line(self.screen, sky_color, 
+                           (0, y + view_bob), (SCREEN_WIDTH, y + view_bob))
+    
+    def render_town_ground(self, view_bob):
+        """Render textured cobblestone-like ground"""
+        ground_start_y = SCREEN_HEIGHT // 2 + view_bob
+        
+        # Create cobblestone pattern
+        for y in range(ground_start_y, SCREEN_HEIGHT):
+            for x in range(0, SCREEN_WIDTH, 20):
+                # Alternate between two gray shades to simulate cobblestones
+                if ((x // 20) + (y // 10)) % 2:
+                    color = GRAY
+                else:
+                    color = DARK_GRAY
+                    
+                pygame.draw.rect(self.screen, color, (x, y, 20, 10))
+    
+    def render_textured_wall(self, x_pos, wall_y, wall_height, base_color, wall_type, depth):
+        """Render walls with simple texture effects"""
+        wall_width = 2
+        
+        # Base wall
+        pygame.draw.rect(self.screen, base_color, (x_pos * 2, wall_y, wall_width, wall_height))
+        
+        # Add texture details based on wall type
+        if wall_type == 3:  # Weapon shop - add forge-like effects
+            if int(wall_height) > 20:  # Only add details if wall is big enough
+                # Add darker vertical lines for forge effect
+                for i in range(int(wall_height) // 15):
+                    line_y = wall_y + i * 15
+                    darker_color = tuple(max(0, c - 30) for c in base_color)
+                    pygame.draw.line(self.screen, darker_color, 
+                                   (x_pos * 2, line_y), (x_pos * 2 + wall_width, line_y))
+                                   
+        elif wall_type == 4:  # Magic shop - add mystical effects
+            if int(wall_height) > 30:
+                # Add purple highlights for magical effect
+                highlight_color = tuple(min(255, c + 20) for c in base_color)
+                pygame.draw.line(self.screen, highlight_color,
+                               (x_pos * 2, wall_y), (x_pos * 2, wall_y + wall_height))
+                               
+        elif wall_type == 5:  # Healer - add clean stone blocks
+            if int(wall_height) > 25:
+                # Add horizontal lines for stone blocks
+                for i in range(int(wall_height) // 20):
+                    line_y = wall_y + i * 20
+                    lighter_color = tuple(min(255, c + 15) for c in base_color)
+                    pygame.draw.line(self.screen, lighter_color,
+                                   (x_pos * 2, line_y), (x_pos * 2 + wall_width, line_y))
+                                   
+        elif wall_type == 6:  # Arena entrance - add ornate details
+            if int(wall_height) > 40:
+                # Add golden highlights
+                highlight_color = tuple(min(255, c + 30) for c in base_color)
+                # Vertical highlight in center
+                pygame.draw.line(self.screen, highlight_color,
+                               (x_pos * 2 + 1, wall_y), (x_pos * 2 + 1, wall_y + wall_height))
 
     def render_3d_arena(self, rays: List[Tuple[float, float, int]], enemies, spells, player):
         """Render 3D arena view with enemies and spells"""

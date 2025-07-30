@@ -1,9 +1,60 @@
 import pygame
 import math
-from constants import GameState, ShopType
 from constants import *
 from raycaster import RayCaster
 from town_map import TownMap
+
+class NPC:
+    """Simple NPC that wanders around town"""
+    def __init__(self, x, y, name, color=BLUE):
+        self.x = x
+        self.y = y
+        self.name = name
+        self.color = color
+        self.size = 12
+        self.speed = 15
+        
+        # Wandering behavior
+        self.target_x = x
+        self.target_y = y
+        self.wander_radius = 100
+        self.home_x = x
+        self.home_y = y
+        self.target_reached_time = 0
+        self.wait_time = 2000  # Wait 2 seconds before moving to new target
+        
+    def update(self, dt, current_time):
+        """Update NPC movement"""
+        # Check if we've reached our target
+        distance_to_target = math.sqrt((self.x - self.target_x)**2 + (self.y - self.target_y)**2)
+        
+        if distance_to_target < 20:  # Close enough to target
+            if current_time - self.target_reached_time > self.wait_time:
+                self.set_new_target()
+                self.target_reached_time = current_time
+        else:
+            # Move toward target
+            dx = self.target_x - self.x
+            dy = self.target_y - self.y
+            if distance_to_target > 0:
+                dx /= distance_to_target
+                dy /= distance_to_target
+                
+                self.x += dx * self.speed * dt
+                self.y += dy * self.speed * dt
+                
+    def set_new_target(self):
+        """Set a new random target within wander radius"""
+        import random
+        angle = random.uniform(0, 2 * math.pi)
+        distance = random.uniform(30, self.wander_radius)
+        
+        self.target_x = self.home_x + math.cos(angle) * distance
+        self.target_y = self.home_y + math.sin(angle) * distance
+        
+        # Keep within reasonable bounds (simple check)
+        self.target_x = max(100, min(800, self.target_x))
+        self.target_y = max(100, min(800, self.target_y))
 
 class TownState:
     def __init__(self, screen, game_manager, player):
@@ -20,13 +71,21 @@ class TownState:
         self.show_interaction_prompt = False
         self.current_interaction = None
         
+        # Initialize NPCs around town
+        self.npcs = [
+            NPC(200, 300, "Townsperson", BLUE),
+            NPC(400, 200, "Merchant", GREEN),
+            NPC(600, 400, "Guard", BROWN),
+            NPC(300, 500, "Villager", PURPLE),
+        ]
+        
         self.font = pygame.font.Font(None, 24)
         
     def initialize_town(self):
         """Initialize/reset town state"""
-        # Place player at town entrance
-        self.player.x = 6 * TILE_SIZE + TILE_SIZE // 2
-        self.player.y = 14 * TILE_SIZE + TILE_SIZE // 2
+        # Place player at town entrance (bottom center opening)
+        self.player.x = 9 * TILE_SIZE + TILE_SIZE // 2  # Center of opening
+        self.player.y = 18 * TILE_SIZE + TILE_SIZE // 2  # Just inside the opening
         self.player.angle = math.pi / 2  # Facing north
         
     def handle_event(self, event):
@@ -93,11 +152,17 @@ class TownState:
                             self.current_interaction = "arena"
                             
     def update(self, dt):
+        current_time = pygame.time.get_ticks()
+        
         # Update player
         keys = pygame.key.get_pressed()
         self.player.move(keys, dt, self.town_map.collision_map, 
                         self.town_map.width, self.town_map.height)
         self.player.update(dt)
+        
+        # Update NPCs
+        for npc in self.npcs:
+            npc.update(dt, current_time)
         
         # Check for interactions
         self.check_interactions()
@@ -110,8 +175,72 @@ class TownState:
                                        self.town_map.width, self.town_map.height)
         self.raycaster.render_3d_town(rays, self.player)
         
+        # Render NPCs in 3D space
+        self.render_npcs()
+        
         # Draw UI
         self.draw_ui()
+        
+    def render_npcs(self):
+        """Render NPCs in 3D space"""
+        view_bob = int(self.player.z * 0.3)
+        
+        for npc in self.npcs:
+            dx = npc.x - self.player.x
+            dy = npc.y - self.player.y
+            npc_distance = math.sqrt(dx * dx + dy * dy)
+            
+            if npc_distance < 0.1:
+                continue
+                
+            npc_angle = math.atan2(dy, dx)
+            angle_diff = npc_angle - self.player.angle
+            
+            # Normalize angle difference
+            while angle_diff > math.pi:
+                angle_diff -= 2 * math.pi
+            while angle_diff < -math.pi:
+                angle_diff += 2 * math.pi
+                
+            # Check if NPC is in FOV
+            if abs(angle_diff) < HALF_FOV:
+                screen_x = (angle_diff / HALF_FOV) * (SCREEN_WIDTH // 2) + (SCREEN_WIDTH // 2)
+                
+                npc_size = npc.size * 800 / (npc_distance + 0.1)
+                npc_height = npc_size * 1.5  # NPCs are taller than wide
+                
+                # Draw NPC with jump bob effect
+                npc_rect = (
+                    screen_x - npc_size // 2,
+                    (SCREEN_HEIGHT - npc_height) // 2 + view_bob,
+                    npc_size,
+                    npc_height
+                )
+                pygame.draw.rect(self.screen, npc.color, npc_rect)
+                
+                # Draw simple face
+                if npc_size > 10:
+                    # Eyes
+                    eye_size = max(1, int(npc_size // 8))
+                    left_eye_x = int(screen_x - npc_size // 4)
+                    right_eye_x = int(screen_x + npc_size // 4)
+                    eye_y = int((SCREEN_HEIGHT - npc_height) // 2 + npc_height // 3 + view_bob)
+                    
+                    pygame.draw.circle(self.screen, WHITE, (left_eye_x, eye_y), eye_size)
+                    pygame.draw.circle(self.screen, WHITE, (right_eye_x, eye_y), eye_size)
+                
+                # Draw name above NPC if close enough
+                if npc_distance < 150 and npc_size > 15:
+                    name_font = pygame.font.Font(None, max(12, int(npc_size // 3)))
+                    name_text = name_font.render(npc.name, True, WHITE)
+                    name_rect = name_text.get_rect(center=(screen_x, npc_rect[1] - 15))
+                    
+                    # Draw background for name
+                    bg_rect = name_rect.inflate(4, 2)
+                    pygame.draw.rect(self.screen, BLACK, bg_rect)
+                    pygame.draw.rect(self.screen, WHITE, bg_rect, 1)
+                    
+                    self.screen.blit(name_text, name_rect)
         
     def draw_ui(self):
         # Draw player stats
