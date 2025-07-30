@@ -40,6 +40,11 @@ class TownMap:
         
     def get_tile(self, x, y):
         """Get tile type at given coordinates"""
+        # Ensure coordinates are integers
+        x = int(x)
+        y = int(y)
+        
+        # Check bounds more carefully
         if 0 <= x < self.width and 0 <= y < self.height:
             return self.collision_map[y][x]
         return 1  # Return wall for out of bounds
