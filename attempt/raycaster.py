@@ -82,14 +82,14 @@ class RayCaster:
                 color_intensity = max(50, 255 - int(depth * 4))
                 wall_color = tuple(min(255, int(c * color_intensity / 255)) for c in base_color)
 
-            # Apply jump bob to wall rendering
-            wall_y = (SCREEN_HEIGHT - wall_height) // 2 + view_bob
-            
-            pygame.draw.rect(
-                self.screen,
-                wall_color,
-                (i * 2, wall_y, 2, wall_height)
-            )
+                # Apply jump bob to wall rendering
+                wall_y = (SCREEN_HEIGHT - wall_height) // 2 + view_bob
+                
+                pygame.draw.rect(
+                    self.screen,
+                    wall_color,
+                    (i * 2, wall_y, 2, wall_height)
+                )
 
     def render_3d_arena(self, rays: List[Tuple[float, float, int]], enemies, spells, player):
         """Render 3D arena view"""
