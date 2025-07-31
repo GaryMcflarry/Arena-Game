@@ -6,7 +6,7 @@ from town_map import TownMap
 
 class NPC:
     """Simple NPC that wanders around town"""
-    def __init__(self, x, y, name, color=BLUE):
+    def __init__(self, x, y, name, color=BLUE, dialogue=None):
         self.x = x
         self.y = y
         self.name = name
@@ -14,14 +14,18 @@ class NPC:
         self.size = 12
         self.speed = 15
         
+        # Dialogue system
+        self.dialogue = dialogue or [f"Greetings, traveler! I am {name}."]
+        self.has_talked = False
+        
         # Wandering behavior
         self.target_x = x
         self.target_y = y
-        self.wander_radius = 100
+        self.wander_radius = 80
         self.home_x = x
         self.home_y = y
         self.target_reached_time = 0
-        self.wait_time = 2000  # Wait 2 seconds before moving to new target
+        self.wait_time = 3000  # Wait 3 seconds before moving to new target
         
     def update(self, dt, current_time):
         """Update NPC movement"""
@@ -52,9 +56,9 @@ class NPC:
         self.target_x = self.home_x + math.cos(angle) * distance
         self.target_y = self.home_y + math.sin(angle) * distance
         
-        # Keep within reasonable bounds (simple check)
-        self.target_x = max(100, min(800, self.target_x))
-        self.target_y = max(100, min(800, self.target_y))
+        # Keep within town bounds (20x20 map = 1280x1280 world coordinates)
+        self.target_x = max(100, min(1180, self.target_x))  # Stay within map
+        self.target_y = max(100, min(1180, self.target_y))  # Stay within map
 
 class TownState:
     def __init__(self, screen, game_manager, player):
@@ -80,6 +84,7 @@ class TownState:
         ]
         
         self.font = pygame.font.Font(None, 24)
+        self.dialogue_font = pygame.font.Font(None, 20)
         
     def initialize_town(self):
         """Initialize/reset town state"""
@@ -90,12 +95,24 @@ class TownState:
         
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_e and self.current_interaction:
-                self.interact_with_building()
+            if event.key == pygame.K_e:
+                if self.current_interaction:
+                    self.interact_with_building()
+                elif self.current_npc:
+                    self.talk_to_npc()
             elif event.key == pygame.K_m:
                 pass  # Could toggle minimap
         elif event.type == pygame.MOUSEMOTION:
             self.player.handle_mouse_look(event.rel)
+            
+    def talk_to_npc(self):
+        """Handle talking to NPCs"""
+        if self.current_npc:
+            import random
+            self.dialogue_text = random.choice(self.current_npc.dialogue)
+            self.show_dialogue = True
+            self.dialogue_timer = 0
+            self.current_npc.has_talked = True
             
     def interact_with_building(self):
         """Handle interaction with buildings"""
@@ -109,11 +126,24 @@ class TownState:
             self.game_manager.change_state(GameState.ARENA)
             
     def check_interactions(self):
-        """Check for nearby interactive objects"""
+        """Check for nearby interactive objects and NPCs"""
         self.show_interaction_prompt = False
         self.current_interaction = None
+        self.current_npc = None
         
-        # Get player map position
+        # Check for NPCs first
+        for npc in self.npcs:
+            distance = math.sqrt(
+                (self.player.x - npc.x) ** 2 + 
+                (self.player.y - npc.y) ** 2
+            )
+            
+            if distance < self.interaction_range:
+                self.show_interaction_prompt = True
+                self.current_npc = npc
+                return  # Priority to NPCs over buildings
+        
+        # Check for buildings if no NPC nearby
         player_map_x = int(self.player.x // TILE_SIZE)
         player_map_y = int(self.player.y // TILE_SIZE)
         
@@ -257,30 +287,68 @@ class TownState:
             
         # Draw interaction prompt
         if self.show_interaction_prompt:
-            interaction_names = {
-                "weapon_shop": "Weapon Shop",
-                "magic_shop": "Magic Shop", 
-                "healer": "Healer",
-                "arena": "Arena Entrance"
-            }
+            if self.current_npc:
+                prompt_text = f"Press E to talk to {self.current_npc.name.split()[0]}"
+                prompt_color = self.current_npc.color
+            else:
+                interaction_names = {
+                    "weapon_shop": "Weapon Shop",
+                    "magic_shop": "Magic Shop", 
+                    "healer": "Healer",
+                    "arena": "Arena Entrance"
+                }
+                prompt_text = f"Press E to enter {interaction_names.get(self.current_interaction, 'building')}"
+                prompt_color = YELLOW
             
-            prompt_text = f"Press E to enter {interaction_names.get(self.current_interaction, 'building')}"
-            text_surface = self.font.render(prompt_text, True, YELLOW)
+            text_surface = self.font.render(prompt_text, True, prompt_color)
             text_rect = text_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 50))
             
             # Draw background for better visibility
             bg_rect = text_rect.inflate(20, 10)
             pygame.draw.rect(self.screen, BLACK, bg_rect)
-            pygame.draw.rect(self.screen, YELLOW, bg_rect, 2)
+            pygame.draw.rect(self.screen, prompt_color, bg_rect, 2)
             
             self.screen.blit(text_surface, text_rect)
             
-        # Draw minimap
+        # Draw dialogue if active
+        if self.show_dialogue:
+            dialogue_y = SCREEN_HEIGHT - 120
+            dialogue_rect = pygame.Rect(50, dialogue_y, SCREEN_WIDTH - 100, 60)
+            
+            # Draw dialogue background
+            pygame.draw.rect(self.screen, BLACK, dialogue_rect)
+            pygame.draw.rect(self.screen, WHITE, dialogue_rect, 2)
+            
+            # Draw dialogue text (word wrap)
+            words = self.dialogue_text.split(' ')
+            lines = []
+            current_line = []
+            
+            for word in words:
+                test_line = ' '.join(current_line + [word])
+                text_width = self.dialogue_font.get_size(test_line)[0]
+                
+                if text_width < dialogue_rect.width - 20:
+                    current_line.append(word)
+                else:
+                    lines.append(' '.join(current_line))
+                    current_line = [word]
+            
+            if current_line:
+                lines.append(' '.join(current_line))
+            
+            # Draw lines
+            for i, line in enumerate(lines[:2]):  # Max 2 lines
+                line_y = dialogue_y + 15 + i * 20
+                line_surface = self.dialogue_font.render(line, True, WHITE)
+                self.screen.blit(line_surface, (dialogue_rect.x + 10, line_y))
+            
+        # Draw minimap with NPCs
         self.draw_minimap()
         
     def draw_minimap(self):
-        """Draw a simple minimap"""
-        map_scale = 8
+        """Draw a minimap with NPCs"""
+        map_scale = 6
         map_size = 120
         map_x = SCREEN_WIDTH - map_size - 10
         map_y = 10
@@ -290,36 +358,54 @@ class TownState:
         pygame.draw.rect(self.screen, WHITE, (map_x, map_y, map_size, map_size), 2)
         
         # Draw map tiles
-        for y in range(self.town_map.height):
-            for x in range(self.town_map.width):
-                tile_type = self.town_map.get_tile(x, y)
-                
-                if tile_type != 0:  # Not empty space
-                    color = WHITE
-                    if tile_type == 1:  # Wall
-                        color = BROWN
-                    elif tile_type == 2:  # House
-                        color = GRAY
-                    elif tile_type in [3, 4, 5]:  # Shops
-                        color = BLUE
-                    elif tile_type == 6:  # Arena
-                        color = RED
-                        
-                    tile_x = map_x + x * map_scale
-                    tile_y = map_y + y * map_scale
-                    pygame.draw.rect(self.screen, color, 
-                                   (tile_x, tile_y, map_scale, map_scale))
+        for y in range(min(20, self.town_map.height)):
+            for x in range(min(20, self.town_map.width)):
+                if x < self.town_map.width and y < self.town_map.height:
+                    tile_type = self.town_map.get_tile(x, y)
+                    
+                    if tile_type != 0:  # Not empty space
+                        color = WHITE
+                        if tile_type == 1:  # Wall
+                            color = BROWN
+                        elif tile_type == 2:  # House
+                            color = GRAY
+                        elif tile_type in [3, 4, 5]:  # Shops
+                            color = BLUE
+                        elif tile_type == 6:  # Arena
+                            color = RED
+                            
+                        tile_x = map_x + x * map_scale
+                        tile_y = map_y + y * map_scale
+                        pygame.draw.rect(self.screen, color, 
+                                       (tile_x, tile_y, map_scale, map_scale))
+                    
+        # Draw NPCs on minimap
+        for npc in self.npcs:
+            npc_map_x = int(map_x + (npc.x / TILE_SIZE) * map_scale)
+            npc_map_y = int(map_y + (npc.y / TILE_SIZE) * map_scale)
+            
+            if (map_x <= npc_map_x <= map_x + map_size and 
+                map_y <= npc_map_y <= map_y + map_size):
+                pygame.draw.circle(self.screen, npc.color, (npc_map_x, npc_map_y), 2)
                     
         # Draw player position
         player_map_x = int(self.player.x // TILE_SIZE)
         player_map_y = int(self.player.y // TILE_SIZE)
         
-        player_x = map_x + player_map_x * map_scale + map_scale // 2
-        player_y = map_y + player_map_y * map_scale + map_scale // 2
-        
-        pygame.draw.circle(self.screen, YELLOW, (player_x, player_y), 3)
-        
-        # Draw player direction
-        end_x = player_x + int(math.cos(self.player.angle) * 8)
-        end_y = player_y + int(math.sin(self.player.angle) * 8)
-        pygame.draw.line(self.screen, YELLOW, (player_x, player_y), (end_x, end_y), 2)
+        if (0 <= player_map_x < 20 and 0 <= player_map_y < 20):
+            player_x = map_x + player_map_x * map_scale
+            player_y = map_y + player_map_y * map_scale
+            
+            pygame.draw.circle(self.screen, YELLOW, (player_x, player_y), 3)
+            
+            # Draw player direction
+            end_x = player_x + int(math.cos(self.player.angle) * 8)
+            end_y = player_y + int(math.sin(self.player.angle) * 8)
+            pygame.draw.line(self.screen, YELLOW, (player_x, player_y), (end_x, end_y), 2)
+            
+            pygame.draw.circle(self.screen, YELLOW, (player_x, player_y), 3)
+            
+            # Draw player direction
+            end_x = player_x + int(math.cos(self.player.angle) * 8)
+            end_y = player_y + int(math.sin(self.player.angle) * 8)
+            pygame.draw.line(self.screen, YELLOW, (player_x, player_y), (end_x, end_y), 2)
