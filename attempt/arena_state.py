@@ -271,6 +271,15 @@ class ArenaState:
             
     def cast_spell(self, spell_type):
         """Cast a spell (no cooldowns, only mana cost)"""
+        if self.sound_manager:
+            print(f"Sound manager has {len(self.sound_manager.sounds)} sounds")
+            print(f"Available sounds: {list(self.sound_manager.sounds.keys())}")
+            print(f"Attempting to play 'spell_cast' sound...")
+        try:
+            self.sound_manager.play_sound('spell_cast')
+            print("✓ play_sound() called successfully")
+        except Exception as e:
+            print(f"✗ play_sound() failed: {e}")
         if self.player.mana >= self.player.spell_costs[spell_type]:
             # Deduct mana cost
             self.player.mana -= self.player.spell_costs[spell_type]
