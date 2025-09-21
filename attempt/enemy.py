@@ -1,106 +1,244 @@
 import math
+import pygame
 from constants import *
 
+
 class Enemy:
+    # Class-level (shared) asset cache so we don't reload images every time
+    enemy_images = {}
+    
+    @classmethod
+    def load_images(cls):
+        """Load enemy images with fallback handling"""
+        try:
+            cls.enemy_images = {
+                EnemyType.SKELETON: pygame.image.load("../assets/textures/enemies/skeleton.gif"),
+                EnemyType.ORC: pygame.image.load("../assets/textures/enemies/orc.gif"),
+                EnemyType.TROLL: pygame.image.load("../assets/textures/enemies/troll.gif"),
+                EnemyType.DEMON: pygame.image.load("../assets/textures/enemies/demon.gif"),
+            }
+        except pygame.error:
+            # Create fallback colored squares if images don't exist
+            cls.enemy_images = {}
+            colors = {
+                EnemyType.SKELETON: WHITE,
+                EnemyType.ORC: DARK_GREEN,
+                EnemyType.TROLL: BROWN,
+                EnemyType.DEMON: DARK_RED
+            }
+            for enemy_type, color in colors.items():
+                surface = pygame.Surface((32, 32))
+                surface.fill(color)
+                cls.enemy_images[enemy_type] = surface
+
     def __init__(self, x: float, y: float, enemy_type: str = EnemyType.SKELETON):
         self.x = x
         self.y = y
         self.enemy_type = enemy_type
-        
+
         # Type-specific stats
         if enemy_type == EnemyType.SKELETON:
             self.health = 75
             self.max_health = 75
             self.speed = 40
             self.attack_damage = 15
-            self.color = WHITE
             self.size = 15
-            self.score_value = 50
+            self.score_value = 15  # Reduced from 25
+            self.attack_range = 45
+            self.is_ranged = False
         elif enemy_type == EnemyType.ORC:
             self.health = 120
             self.max_health = 120
             self.speed = 35
             self.attack_damage = 25
-            self.color = GREEN
             self.size = 18
-            self.score_value = 75
+            self.score_value = 20  # Reduced from 35
+            self.attack_range = 45
+            self.is_ranged = False
         elif enemy_type == EnemyType.TROLL:
             self.health = 200
             self.max_health = 200
             self.speed = 25
             self.attack_damage = 40
-            self.color = BROWN
             self.size = 25
-            self.score_value = 150
+            self.score_value = 45  # Reduced from 75
+            self.attack_range = 45
+            self.is_ranged = False
         elif enemy_type == EnemyType.DEMON:
             self.health = 150
             self.max_health = 150
             self.speed = 50
             self.attack_damage = 30
-            self.color = DARK_RED
             self.size = 20
-            self.score_value = 200
+            self.score_value = 60  # Reduced from 100
+            self.attack_range = 120  # Ranged enemy
+            self.is_ranged = True
+
+        # Load and scale enemy image
+        if not Enemy.enemy_images:
+            Enemy.load_images()
             
-        self.attack_range = 45
+        self.image = pygame.transform.scale(
+            Enemy.enemy_images[self.enemy_type], (self.size * 2, self.size * 2)
+        )
+        self.rect = self.image.get_rect(center=(self.x, self.y))
+
         self.last_attack = 0
         self.attack_cooldown = 2000  # milliseconds
         self.alive = True
         
+        # Ranged attack properties for demons
+        self.projectiles = []
+        self.projectile_speed = 200
+
     def update(self, player, dt, current_time):
         """Update enemy behavior"""
         if not self.alive:
             return
-            
-        # Move toward player
+
         dx = player.x - self.x
         dy = player.y - self.y
         distance = math.sqrt(dx * dx + dy * dy)
-        
-        if distance > self.attack_range:
-            # Normalize direction and move
-            if distance > 0:
-                dx /= distance
-                dy /= distance
-                
-                new_x = self.x + dx * self.speed * dt
-                new_y = self.y + dy * self.speed * dt
-                
-                # Simple collision check
-                if not self.check_collision(new_x, new_y):
-                    self.x = new_x
-                    self.y = new_y
-                    
-        # Attack player if in range
-        elif distance <= self.attack_range and current_time - self.last_attack > self.attack_cooldown:
-            player.take_damage(self.attack_damage)
-            self.last_attack = current_time
+
+        # Different behavior for ranged vs melee enemies
+        if self.is_ranged:
+            # Ranged enemies (demons) try to maintain distance and shoot
+            if distance > self.attack_range:
+                # Move closer if too far
+                self.move_towards_player(player, dt, distance, dx, dy)
+            elif distance < 80:
+                # Move away if too close
+                self.move_away_from_player(player, dt, distance, dx, dy)
             
-    def check_collision(self, x: float, y: float) -> bool:
-        """Check collision with arena walls"""
-        from arena_map import ArenaMap  # Import here to avoid circular imports
+            # Attack if in range and cooldown ready
+            if distance <= self.attack_range and current_time - self.last_attack > self.attack_cooldown:
+                self.ranged_attack(player, current_time)
+        else:
+            # Melee enemies move towards player and attack when close
+            if distance > self.attack_range:
+                self.move_towards_player(player, dt, distance, dx, dy)
+            elif current_time - self.last_attack > self.attack_cooldown:
+                self.melee_attack(player, current_time)
         
-        # Simple bounds check - assumes we're in arena
+        # Update projectiles for ranged enemies
+        if self.is_ranged:
+            self.update_projectiles(dt, player)
+
+    def move_towards_player(self, player, dt, distance, dx, dy):
+        """Move towards the player"""
+        if distance > 0:
+            dx /= distance
+            dy /= distance
+
+            new_x = self.x + dx * self.speed * dt
+            new_y = self.y + dy * self.speed * dt
+
+            if not self.check_collision(new_x, new_y):
+                self.x = new_x
+                self.y = new_y
+                self.rect.center = (self.x, self.y)
+
+    def move_away_from_player(self, player, dt, distance, dx, dy):
+        """Move away from the player (for ranged enemies)"""
+        if distance > 0:
+            dx /= distance
+            dy /= distance
+
+            # Move in opposite direction
+            new_x = self.x - dx * self.speed * 0.5 * dt  # Move slower when retreating
+            new_y = self.y - dy * self.speed * 0.5 * dt
+
+            if not self.check_collision(new_x, new_y):
+                self.x = new_x
+                self.y = new_y
+                self.rect.center = (self.x, self.y)
+
+    def melee_attack(self, player, current_time):
+        """Perform melee attack"""
+        player.take_damage(self.attack_damage)
+        self.last_attack = current_time
+
+    def ranged_attack(self, player, current_time):
+        """Perform ranged attack by creating a projectile"""
+        # Calculate angle to player
+        dx = player.x - self.x
+        dy = player.y - self.y
+        angle = math.atan2(dy, dx)
+        
+        # Create projectile
+        projectile = {
+            'x': self.x,
+            'y': self.y,
+            'angle': angle,
+            'damage': self.attack_damage,
+            'alive': True
+        }
+        self.projectiles.append(projectile)
+        self.last_attack = current_time
+
+    def update_projectiles(self, dt, player):
+        """Update enemy projectiles"""
+        for projectile in self.projectiles[:]:  # Use slice copy to safely modify list
+            if not projectile['alive']:
+                self.projectiles.remove(projectile)
+                continue
+                
+            # Move projectile
+            projectile['x'] += math.cos(projectile['angle']) * self.projectile_speed * dt
+            projectile['y'] += math.sin(projectile['angle']) * self.projectile_speed * dt
+            
+            # Check collision with player
+            dx = projectile['x'] - player.x
+            dy = projectile['y'] - player.y
+            distance = math.sqrt(dx * dx + dy * dy)
+            
+            if distance < 20:  # Hit player
+                player.take_damage(projectile['damage'])
+                projectile['alive'] = False
+                
+            # Check collision with walls
+            elif self.check_collision(projectile['x'], projectile['y']):
+                projectile['alive'] = False
+
+    def check_collision(self, x: float, y: float) -> bool:
+        """Collision check with bounds"""
         map_x = int(x // TILE_SIZE)
         map_y = int(y // TILE_SIZE)
-        
-        # Basic arena bounds (this should be improved to use actual arena map)
+
         if map_x < 0 or map_x >= 20 or map_y < 0 or map_y >= 20:
             return True
-            
-        # For now, assume center area is clear and edges are walls
+
         center_x, center_y = 10, 10
         distance = math.sqrt((map_x - center_x) ** 2 + (map_y - center_y) ** 2)
-        
-        return distance > 8  # Arena radius
-        
+
+        return distance > 8
+
     def take_damage(self, damage):
-        """Take damage and check if enemy dies"""
         self.health -= damage
         if self.health <= 0:
             self.alive = False
-            
+
     def get_distance_to(self, x, y):
-        """Get distance to a point"""
         dx = self.x - x
         dy = self.y - y
         return math.sqrt(dx * dx + dy * dy)
+
+    def get_health_percentage(self):
+        """Get health as percentage for health bar"""
+        return self.health / self.max_health
+
+    def draw(self, surface):
+        """Render the enemy on screen"""
+        if self.alive:
+            surface.blit(self.image, self.rect)
+
+    def draw_projectiles_2d(self, surface, camera_x=0, camera_y=0):
+        """Draw enemy projectiles in 2D (for debugging/minimap)"""
+        for projectile in self.projectiles:
+            if projectile['alive']:
+                proj_x = int(projectile['x'] - camera_x)
+                proj_y = int(projectile['y'] - camera_y)
+                
+                # Draw projectile as a small red circle
+                pygame.draw.circle(surface, RED, (proj_x, proj_y), 3)
+                pygame.draw.circle(surface, YELLOW, (proj_x, proj_y), 1)

@@ -1,7 +1,6 @@
 import pygame
 import math
 import random
-from constants import SPELL_TYPES, BossType, GameState
 from constants import *
 from raycaster import RayCaster
 from arena_map import ArenaMap
@@ -15,464 +14,920 @@ class ArenaState:
         self.game_manager = game_manager
         self.player = player
         
-        # Initialize arena map
+        # Initialize arena map and raycaster
         self.arena_map = ArenaMap()
         self.raycaster = RayCaster(screen)
+        
+        # Sound manager - will be set by game manager
+        self.sound_manager = None
         
         # Game state
         self.enemies = []
         self.bosses = []
         self.spells = []
-        self.score = 0
-        self.current_wave = 0
-        self.wave_active = False
-        self.enemies_killed_this_wave = 0
+        
+        # Wave system - persistent across visits
+        self.current_wave = 1
+        self.wave_progress_saved = False  # Track if we came from shop after boss
+        self.enemies_remaining = 0
+        self.wave_completed = False
         self.wave_start_time = 0
-        self.time_between_waves = 5000  # 5 seconds
-        self.show_map = False
+        self.between_waves = False
+        self.wave_delay = 3000  # 3 seconds between waves
         
-        # Wave configuration
-        self.waves_per_boss = 5  # Boss every 5 waves
-        self.max_waves = 20
+        # Boss system
+        self.boss_wave = False
+        self.boss_defeated = False
+        self.show_shop_prompt = False
+        self.shop_prompt_timer = 0
+        self.shop_prompt_duration = 10000  # 10 seconds to decide
         
-        self.font = pygame.font.Font(None, 24)
-        self.big_font = pygame.font.Font(None, 48)
+        # Game over system
+        self.game_over = False
+        self.game_over_timer = 0
+        self.game_over_duration = 5000  # 5 seconds before auto-return to menu
+        
+        # UI
+        self.font = pygame.font.Font(None, 32)
+        self.small_font = pygame.font.Font(None, 24)
+        self.large_font = pygame.font.Font(None, 48)
+        
+        # Arena center for spawning
+        self.arena_center_x = 10 * TILE_SIZE
+        self.arena_center_y = 10 * TILE_SIZE
+        self.spawn_radius = 7 * TILE_SIZE
         
     def initialize_arena(self):
-        """Initialize/reset arena for new run"""
-        # Reset player stats for arena
-        self.player.reset_for_arena()
-        
-        # Place player in center of arena
-        center_x = self.arena_map.width * TILE_SIZE // 2
-        center_y = self.arena_map.height * TILE_SIZE // 2
-        self.player.x = center_x
-        self.player.y = center_y
+        """Initialize/reset arena for new session"""
+        # Place player at arena center
+        self.player.x = self.arena_center_x
+        self.player.y = self.arena_center_y
         self.player.angle = 0
         
-        # Reset arena state
+        # Reset player health and mana
+        self.player.reset_for_arena()
+        
+        # Only reset to wave 1 if not continuing from shop
+        if not self.wave_progress_saved:
+            self.current_wave = 1
+        
+        # Always reset these
         self.enemies = []
         self.bosses = []
         self.spells = []
-        self.score = 0
-        self.current_wave = 0
-        self.wave_active = False
-        self.enemies_killed_this_wave = 0
-        self.wave_start_time = 0
+        self.wave_completed = False
+        self.between_waves = False
+        self.boss_wave = False
+        self.boss_defeated = False
+        self.show_shop_prompt = False
         
-        self.start_next_wave()
+        # Start current wave
+        self.start_wave()
         
-    def get_spawn_positions(self, count):
-        """Get random spawn positions around the arena edge"""
-        positions = []
-        center_x, center_y = self.arena_map.width // 2, self.arena_map.height // 2
+    def continue_from_shop(self):
+        """Continue arena after visiting shop - preserve wave"""
+        self.wave_progress_saved = True
+        self.current_wave += 1  # Move to next wave after shop visit
+        self.initialize_arena()
+        self.wave_progress_saved = False  # Reset flag
         
-        for _ in range(count):
-            # Spawn around the edge of the arena
-            angle = random.uniform(0, 2 * math.pi)
-            radius = 7  # Near the edge but inside the arena
-            
-            spawn_x = center_x + math.cos(angle) * radius
-            spawn_y = center_y + math.sin(angle) * radius
-            
-            # Convert to world coordinates
-            world_x = spawn_x * TILE_SIZE
-            world_y = spawn_y * TILE_SIZE
-            
-            positions.append((world_x, world_y))
-            
-        return positions
-
-    def start_next_wave(self):
-        """Start the next wave of enemies"""
+    def continue_from_town(self):
+        """Continue arena after visiting town (preserves wave)"""
+        self.preserve_wave = True
+        self.initialize_arena()
+        
+    def continue_arena(self):
+        """Continue arena after shopping"""
+        self.show_shop_prompt = False
+        self.boss_defeated = False
+        self.boss_wave = False
         self.current_wave += 1
-        self.wave_active = True
-        self.enemies_killed_this_wave = 0
+        # Play wave complete sound
+        if self.sound_manager:
+            self.sound_manager.play_sound('wave_complete')
+        self.start_wave()
+        
+    def start_wave(self):
+        """Start a new wave"""
         self.wave_start_time = pygame.time.get_ticks()
+        self.wave_completed = False
+        self.between_waves = False
         
-        # Check if this is a boss wave
-        if self.current_wave % self.waves_per_boss == 0:
-            self.spawn_boss_wave()
+        # Check if this is a boss wave (every 5th wave)
+        if self.current_wave % 5 == 0:
+            self.start_boss_wave()
         else:
-            self.spawn_regular_wave()
+            self.start_regular_wave()
             
-    def spawn_boss_wave(self):
-        """Spawn a boss wave"""
-        boss_type = None
-        if self.current_wave == 5:
-            boss_type = BossType.NECROMANCER
-        elif self.current_wave == 10:
-            boss_type = BossType.ORC_CHIEFTAIN
-        elif self.current_wave == 15:
-            boss_type = BossType.ANCIENT_TROLL
-        elif self.current_wave == 20:
-            boss_type = BossType.DEMON_LORD
-            
-        if boss_type:
-            # Spawn boss in center
-            center_x = self.arena_map.width * TILE_SIZE // 2
-            center_y = self.arena_map.height * TILE_SIZE // 2
-            boss = Boss(center_x, center_y, boss_type)
-            self.bosses.append(boss)
-            
-            # Spawn some regular enemies too (fewer than normal)
-            enemy_count = max(2, self.current_wave // 3)
-            self.spawn_regular_enemies(enemy_count)
-            
-    def spawn_regular_wave(self):
-        """Spawn a regular wave of enemies"""
-        # Calculate enemies for this wave
-        base_enemies = 3
-        additional_enemies = (self.current_wave - 1) * 2
-        total_enemies = min(15, base_enemies + additional_enemies)  # Cap at 15
+    def start_regular_wave(self):
+        """Start a regular enemy wave"""
+        self.boss_wave = False
         
-        self.spawn_regular_enemies(total_enemies)
-        
-    def spawn_regular_enemies(self, count):
-        """Spawn regular enemies"""
-        # Enemy type distribution based on wave
-        enemy_types = []
-        
-        # Always have skeletons
-        skeleton_count = max(1, count // 3)
-        enemy_types.extend([EnemyType.SKELETON] * skeleton_count)
-        
-        # Add orcs starting from wave 2
-        if self.current_wave >= 2:
-            orc_count = max(1, count // 4)
-            enemy_types.extend([EnemyType.ORC] * orc_count)
-            
-        # Add trolls starting from wave 4
-        if self.current_wave >= 4:
-            troll_count = max(1, count // 6)
-            enemy_types.extend([EnemyType.TROLL] * troll_count)
-            
-        # Add demons starting from wave 6
-        if self.current_wave >= 6:
-            demon_count = max(1, count // 8)
-            enemy_types.extend([EnemyType.DEMON] * demon_count)
-        
-        # Fill remaining slots with skeletons
-        while len(enemy_types) < count:
-            enemy_types.append(EnemyType.SKELETON)
-            
-        # Shuffle and limit
-        random.shuffle(enemy_types)
-        enemy_types = enemy_types[:count]
+        # Calculate number of enemies based on wave
+        base_enemies = 4
+        additional_enemies = (self.current_wave - 1) // 2  # +1 enemy every 2 waves
+        num_enemies = base_enemies + additional_enemies
         
         # Spawn enemies
-        spawn_positions = self.get_spawn_positions(len(enemy_types))
+        for _ in range(num_enemies):
+            self.spawn_enemy()
+            
+        self.enemies_remaining = len(self.enemies)
         
-        for i, enemy_type in enumerate(enemy_types):
-            x, y = spawn_positions[i]
-            enemy = Enemy(x, y, enemy_type)
-            self.enemies.append(enemy)
-
+    def start_boss_wave(self):
+        """Start a boss wave"""
+        self.boss_wave = True
+        
+        # Play boss spawn sound
+        if self.sound_manager:
+            self.sound_manager.play_sound('boss_spawn')
+        
+        # Determine boss type based on wave number
+        boss_types = [BossType.NECROMANCER, BossType.ORC_CHIEFTAIN, BossType.ANCIENT_TROLL, BossType.DEMON_LORD]
+        boss_index = ((self.current_wave // 5) - 1) % len(boss_types)
+        boss_type = boss_types[boss_index]
+        
+        # Spawn boss at a safe distance from player
+        boss_x, boss_y = self.get_spawn_position()
+        boss = Boss(boss_x, boss_y, boss_type, self)  # Pass arena reference
+        
+        # Scale boss for higher waves
+        wave_multiplier = 1.0 + ((self.current_wave - 5) // 5) * 0.5  # +50% stats every 5 waves
+        boss.health = int(boss.health * wave_multiplier)
+        boss.max_health = boss.health
+        boss.attack_damage = int(boss.attack_damage * wave_multiplier)
+        
+        self.bosses.append(boss)
+        
+        # Don't spawn additional minions here - bosses handle their own minions
+        self.enemies_remaining = len(self.enemies) + len(self.bosses)
+        
+    def spawn_enemy(self):
+        """Spawn a random enemy"""
+        # Choose enemy type based on wave progression
+        if self.current_wave <= 3:
+            enemy_types = [EnemyType.SKELETON]
+        elif self.current_wave <= 6:
+            enemy_types = [EnemyType.SKELETON, EnemyType.ORC]
+        elif self.current_wave <= 10:
+            enemy_types = [EnemyType.SKELETON, EnemyType.ORC, EnemyType.TROLL]
+        else:
+            enemy_types = [EnemyType.SKELETON, EnemyType.ORC, EnemyType.TROLL, EnemyType.DEMON]
+            
+        enemy_type = random.choice(enemy_types)
+        enemy_x, enemy_y = self.get_spawn_position()
+        enemy = Enemy(enemy_x, enemy_y, enemy_type)
+        
+        # Scale enemy stats based on wave level
+        health_multiplier = 1.0 + (self.current_wave - 1) * 0.3  # +30% health per wave
+        damage_multiplier = 1.0 + (self.current_wave - 1) * 0.2  # +20% damage per wave
+        
+        enemy.health = int(enemy.health * health_multiplier)
+        enemy.max_health = enemy.health
+        enemy.attack_damage = int(enemy.attack_damage * damage_multiplier)
+        
+        self.enemies.append(enemy)
+        
+    def get_spawn_position(self):
+        """Get a valid spawn position around the arena"""
+        attempts = 0
+        while attempts < 50:  # Prevent infinite loop
+            angle = random.uniform(0, 2 * math.pi)
+            distance = random.uniform(self.spawn_radius * 0.7, self.spawn_radius)
+            
+            x = self.arena_center_x + math.cos(angle) * distance
+            y = self.arena_center_y + math.sin(angle) * distance
+            
+            # Check if position is valid and not too close to player
+            if not self.check_spawn_collision(x, y) and self.get_distance_to_player(x, y) > 100:
+                return x, y
+            attempts += 1
+            
+        # Fallback position if can't find good spot
+        return self.arena_center_x + 200, self.arena_center_y + 200
+                
+    def check_spawn_collision(self, x, y):
+        """Check if spawn position collides with walls"""
+        map_x = int(x // TILE_SIZE)
+        map_y = int(y // TILE_SIZE)
+        
+        if map_x < 0 or map_x >= 20 or map_y < 0 or map_y >= 20:
+            return True
+            
+        center_x, center_y = 10, 10
+        distance = math.sqrt((map_x - center_x) ** 2 + (map_y - center_y) ** 2)
+        
+        return distance > 8
+        
+    def get_distance_to_player(self, x, y):
+        """Get distance from position to player"""
+        dx = x - self.player.x
+        dy = y - self.player.y
+        return math.sqrt(dx * dx + dy * dy)
+        
     def handle_event(self, event):
-        current_time = pygame.time.get_ticks()
-        
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_m:
-                self.show_map = not self.show_map
-            elif event.key == pygame.K_1:
-                self.player.current_spell = "fireball"
-            elif event.key == pygame.K_2:
-                self.player.current_spell = "lightning"
-            elif event.key == pygame.K_3:
-                self.player.current_spell = "ice"
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            # Left click to shoot spells
-            if event.button == 1:  # Left mouse button
-                if self.player.cast_spell(self.player.current_spell, current_time):
-                    spell = Spell(self.player.x, self.player.y, self.player.angle, self.player.current_spell)
-                    # Apply spell level damage bonus
-                    spell.damage *= self.player.get_spell_damage_multiplier()
-                    self.spells.append(spell)
-            # Right click to cycle spells
-            elif event.button == 3:  # Right mouse button
-                current_index = SPELL_TYPES.index(self.player.current_spell)
-                self.player.current_spell = SPELL_TYPES[(current_index + 1) % len(SPELL_TYPES)]
-        elif event.type == pygame.MOUSEMOTION:
-            # Mouse look
+            if self.game_over:
+                # Any key press during game over returns to menu
+                self.game_manager.change_state(GameState.MENU)
+                return
+            elif self.show_shop_prompt:
+                if event.key == pygame.K_y:
+                    # Go to shop
+                    self.game_manager.change_state(GameState.TOWN)
+                elif event.key == pygame.K_n:
+                    # Continue arena
+                    self.continue_arena()
+            else:
+                # Spell casting with keyboard (backup)
+                if event.key == pygame.K_1:
+                    self.cast_spell(self.player.current_spell)
+                elif event.key == pygame.K_2:
+                    self.cycle_spell()
+                elif event.key == pygame.K_3:
+                    self.cycle_spell()
+        elif event.type == pygame.MOUSEBUTTONDOWN and not self.show_shop_prompt and not self.game_over:
+            # Mouse controls
+            if event.button == 1:  # Left click - cast current spell
+                self.cast_spell(self.player.current_spell)
+            elif event.button == 3:  # Right click - cycle through spells
+                self.cycle_spell()
+        elif event.type == pygame.MOUSEMOTION and not self.show_shop_prompt and not self.game_over:
             self.player.handle_mouse_look(event.rel)
-
+            
+    def cycle_spell(self):
+        """Cycle to next available spell"""
+        available_spells = self.player.get_available_spells()
+        if len(available_spells) <= 1:
+            return
+            
+        current_index = available_spells.index(self.player.current_spell)
+        next_index = (current_index + 1) % len(available_spells)
+        self.player.current_spell = available_spells[next_index]
+        
+        # Play menu select sound for spell cycling
+        if self.sound_manager:
+            self.sound_manager.play_sound('menu_select')
+            
+    def cast_spell(self, spell_type):
+        """Cast a spell (no cooldowns, only mana cost)"""
+        if self.player.mana >= self.player.spell_costs[spell_type]:
+            # Deduct mana cost
+            self.player.mana -= self.player.spell_costs[spell_type]
+            
+            # Handle heal spell specially
+            if spell_type == "heal":
+                heal_amount = 20 * self.player.get_spell_damage_multiplier()
+                self.player.heal(heal_amount)
+                # Play heal sound
+                if self.sound_manager:
+                    self.sound_manager.play_sound('spell_cast')
+                return  # Don't create projectile for heal
+            
+            # Create spell projectile for damage spells - PASS SOUND MANAGER
+            spell = Spell(self.player.x, self.player.y, self.player.angle, spell_type, self.sound_manager)
+            # Apply spell level damage multiplier
+            spell.damage = int(spell.damage * self.player.get_spell_damage_multiplier())
+            self.spells.append(spell)
+                
     def update(self, dt):
         current_time = pygame.time.get_ticks()
         
+        # Handle game over state
+        if self.game_over:
+            if current_time - self.game_over_timer > self.game_over_duration:
+                # Auto-return to menu after 5 seconds
+                self.game_manager.change_state(GameState.MENU)
+            return
+        
+        # Handle shop prompt timeout
+        if self.show_shop_prompt:
+            if current_time - self.shop_prompt_timer > self.shop_prompt_duration:
+                # Auto-continue if player doesn't decide
+                self.continue_arena()
+            return
+        
         # Update player
         keys = pygame.key.get_pressed()
+        old_x, old_y = self.player.x, self.player.y
+        
         self.player.move(keys, dt, self.arena_map.collision_map, 
                         self.arena_map.width, self.arena_map.height)
+        
+        # Check collision and rollback if necessary
+        player_tile_x = int(self.player.x // TILE_SIZE)
+        player_tile_y = int(self.player.y // TILE_SIZE)
+        
+        if (player_tile_x < 0 or player_tile_x >= self.arena_map.width or
+            player_tile_y < 0 or player_tile_y >= self.arena_map.height or
+            self.arena_map.collision_map[player_tile_y][player_tile_x] != 0):
+            self.player.x, self.player.y = old_x, old_y
+            
         self.player.update(dt)
         
-        # Update enemies
-        for enemy in self.enemies:
+        # Update enemies with death sounds
+        for enemy in self.enemies[:]:
+            old_health = enemy.health
             enemy.update(self.player, dt, current_time)
-        
-        # Update bosses
-        for boss in self.bosses:
+            
+            # Check if enemy took damage and play hit sound
+            if enemy.alive and enemy.health < old_health:
+                if self.sound_manager:
+                    self.sound_manager.play_sound('enemy_hit')
+            
+            if not enemy.alive:
+                self.player.add_gold(enemy.score_value)
+                self.player.total_score += enemy.score_value
+                self.enemies.remove(enemy)
+                # Play enemy death sound
+                if self.sound_manager:
+                    self.sound_manager.play_sound('enemy_death')
+                
+        # Update bosses with death sounds
+        for boss in self.bosses[:]:
+            old_health = boss.health
             boss.update(self.player, dt, current_time)
-        
-        # Update spells
+            
+            # Check if boss took damage and play hit sound
+            if boss.alive and boss.health < old_health:
+                if self.sound_manager:
+                    self.sound_manager.play_sound('enemy_hit')
+            
+            if not boss.alive:
+                self.player.add_gold(boss.score_value)
+                self.player.total_score += boss.score_value
+                self.bosses.remove(boss)
+                if self.boss_wave:
+                    self.boss_defeated = True
+                # Play enemy death sound (bosses use same sound)
+                if self.sound_manager:
+                    self.sound_manager.play_sound('enemy_death')
+                    
+        # Update spells with sound feedback
         for spell in self.spells[:]:
             spell.update(dt, self.arena_map.collision_map, 
                         self.arena_map.width, self.arena_map.height)
+            
             if not spell.alive:
                 self.spells.remove(spell)
                 continue
                 
-            # Check spell-enemy collisions
+            # Check spell collisions with enemies
             for enemy in self.enemies:
-                if enemy.alive:
-                    distance = enemy.get_distance_to(spell.x, spell.y)
-                    if distance < enemy.size:
-                        enemy.take_damage(spell.damage)
-                        spell.alive = False
-                        if not enemy.alive:
-                            self.score += enemy.score_value
-                            self.player.add_gold(enemy.score_value // 2)  # Convert some score to gold
-                            self.enemies_killed_this_wave += 1
-                        break
-                        
-            # Check spell-boss collisions
+                if enemy.alive and self.check_spell_collision(spell, enemy):
+                    enemy.take_damage(spell.damage)
+                    spell.on_hit_target()  # Play hit sound
+                    spell.alive = False
+                    break
+                    
+            # Check spell collisions with bosses
             for boss in self.bosses:
-                if boss.alive:
-                    distance = boss.get_distance_to(spell.x, spell.y)
-                    if distance < boss.size:
-                        boss.take_damage(spell.damage)
-                        spell.alive = False
-                        if not boss.alive:
-                            self.score += boss.score_value
-                            self.player.add_gold(boss.score_value // 2)
-                        break
-        
-        # Remove dead spells
-        self.spells = [s for s in self.spells if s.alive]
+                if boss.alive and self.check_spell_collision(spell, boss):
+                    boss.take_damage(spell.damage)
+                    spell.on_hit_target()  # Play hit sound
+                    spell.alive = False
+                    break
         
         # Check wave completion
-        alive_enemies = [e for e in self.enemies if e.alive]
-        alive_bosses = [b for b in self.bosses if b.alive]
-        
-        if self.wave_active and len(alive_enemies) == 0 and len(alive_bosses) == 0:
-            self.wave_active = False
-            # Clear dead entities
-            self.enemies = []
-            self.bosses = []
+        if not self.between_waves and len(self.enemies) == 0 and len(self.bosses) == 0:
+            self.wave_completed = True
             
-            # Update player's highest wave
-            if self.current_wave > self.player.highest_wave:
-                self.player.highest_wave = self.current_wave
+            if self.boss_wave and self.boss_defeated:
+                # Show shop prompt after boss defeat
+                self.show_shop_prompt = True
+                self.shop_prompt_timer = current_time
+            else:
+                # Start next wave after delay
+                self.between_waves = True
+                self.wave_start_time = current_time
+                # Play wave complete sound
+                if self.sound_manager:
+                    self.sound_manager.play_sound('wave_complete')
                 
-            # Check if game is complete
-            if self.current_wave >= self.max_waves:
-                self.complete_arena()
-                return
-        
-        # Start next wave after delay
-        if (not self.wave_active and 
-            current_time - self.wave_start_time > self.time_between_waves and
-            self.current_wave < self.max_waves):
-            self.start_next_wave()
-        
-        # Check if player is dead
-        if self.player.health <= 0:
-            self.end_arena()
+        # Handle wave transitions
+        if self.between_waves and current_time - self.wave_start_time > self.wave_delay:
+            self.current_wave += 1
+            self.player.highest_wave = max(self.player.highest_wave, self.current_wave)
+            self.start_wave()
             
-    def complete_arena(self):
-        """Handle arena completion"""
-        bonus_gold = 1000
-        self.player.add_gold(bonus_gold)
-        self.player.total_score += self.score
-        # Return to town
-        self.game_manager.change_state(GameState.TOWN)
+        # Check player death
+        if self.player.health <= 0:
+            self.trigger_game_over(current_time)
+            
+    def trigger_game_over(self, current_time):
+        """Trigger game over screen"""
+        self.game_over = True
+        self.game_over_timer = current_time
+        # Play player death sound - could add a specific game over sound
+        if self.sound_manager:
+            self.sound_manager.play_sound('player_hit')
+            
+    def check_spell_collision(self, spell, target):
+        """Check if spell hits target"""
+        dx = spell.x - target.x
+        dy = spell.y - target.y
+        distance = math.sqrt(dx * dx + dy * dy)
+        return distance < target.size + spell.size
         
-    def end_arena(self):
-        """Handle arena failure/death"""
-        self.player.total_score += self.score
-        # Reset health for town
-        self.player.health = self.player.get_max_health()
-        # Return to town
-        self.game_manager.change_state(GameState.TOWN)
-
     def render(self):
         self.screen.fill(BLACK)
-
+        
         # Cast rays and render 3D view
         rays = self.raycaster.cast_rays(self.player, self.arena_map.collision_map,
                                        self.arena_map.width, self.arena_map.height)
         self.raycaster.render_3d_arena(rays, self.enemies, self.spells, self.player)
         
-        # Render bosses
+        # Render bosses manually if raycaster doesn't support them
         if self.bosses:
-            self.raycaster.render_bosses(self.player, self.bosses)
-
-        # Render 2D map if enabled
-        if self.show_map:
-            self.render_2d_map()
-
-        # Draw crosshair
-        self.draw_crosshair()
-
+            self.render_bosses_3d()
+        
+        # Render spell trails over 3D view
+        for spell in self.spells:
+            if hasattr(spell, 'render_trail'):
+                spell.render_trail(self.screen)
+        
+        # Draw 2D health bars and effects over 3D view
+        self.draw_health_bars()
+        
         # Draw UI
         self.draw_ui()
         
-    def draw_crosshair(self):
-        """Draw crosshair with spell type indication"""
-        center_x, center_y = SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2
-        crosshair_color = {
-            "fireball": ORANGE,
-            "lightning": YELLOW,
-            "ice": BLUE
-        }.get(self.player.current_spell, WHITE)
-        
-        # Make crosshair bigger when jumping for feedback
-        crosshair_size = 12 + int(self.player.z * 0.1)
-        line_width = 3 if self.player.is_jumping else 2
-        
-        pygame.draw.line(self.screen, crosshair_color, 
-                        (center_x - crosshair_size, center_y), 
-                        (center_x + crosshair_size, center_y), line_width)
-        pygame.draw.line(self.screen, crosshair_color, 
-                        (center_x, center_y - crosshair_size), 
-                        (center_x, center_y + crosshair_size), line_width)
-        
-        # Jump indicator
-        if self.player.is_jumping:
-            jump_text = self.font.render("JUMPING!", True, YELLOW)
-            text_rect = jump_text.get_rect(center=(center_x, center_y - 40))
-            self.screen.blit(jump_text, text_rect)
-
-    def draw_ui(self):
-        """Draw the game UI"""
-        # Health bar
-        health_ratio = self.player.health / self.player.get_max_health()
-        health_bar_width = 200
-        health_bar_height = 15
-        health_x = 10
-        health_y = SCREEN_HEIGHT - 120
-        
-        pygame.draw.rect(self.screen, RED, (health_x, health_y, health_bar_width, health_bar_height))
-        pygame.draw.rect(self.screen, GREEN, (health_x, health_y, health_bar_width * health_ratio, health_bar_height))
-        
-        health_text = self.font.render(f"Health: {int(self.player.health)}/{self.player.get_max_health()}", True, WHITE)
-        self.screen.blit(health_text, (health_x, health_y - 18))
-        
-        # Mana bar
-        mana_ratio = self.player.mana / self.player.get_max_mana()
-        mana_y = health_y + 25
-        
-        pygame.draw.rect(self.screen, PURPLE, (health_x, mana_y, health_bar_width, health_bar_height))
-        pygame.draw.rect(self.screen, BLUE, (health_x, mana_y, health_bar_width * mana_ratio, health_bar_height))
-        
-        mana_text = self.font.render(f"Mana: {int(self.player.mana)}/{self.player.get_max_mana()}", True, WHITE)
-        self.screen.blit(mana_text, (health_x, mana_y + 18))
-        
-        # Current spell
-        spell_colors = {"fireball": ORANGE, "lightning": YELLOW, "ice": BLUE}
-        spell_text = self.font.render(f"Spell: {self.player.current_spell.title()}", True, spell_colors[self.player.current_spell])
-        self.screen.blit(spell_text, (health_x, mana_y + 45))
-        
-        # Wave info
-        alive_enemies = sum(1 for enemy in self.enemies if enemy.alive)
-        alive_bosses = sum(1 for boss in self.bosses if boss.alive)
-        total_alive = alive_enemies + alive_bosses
-        
-        wave_text = self.font.render(f"Wave: {self.current_wave}/{self.max_waves}", True, GOLD)
-        self.screen.blit(wave_text, (SCREEN_WIDTH - 200, 10))
-        
-        enemies_text = self.font.render(f"Enemies: {total_alive}", True, WHITE)
-        self.screen.blit(enemies_text, (SCREEN_WIDTH - 200, 35))
-        
-        score_text = self.font.render(f"Score: {self.score}", True, WHITE)
-        self.screen.blit(score_text, (SCREEN_WIDTH - 200, 60))
-        
-        gold_text = self.font.render(f"Gold: {self.player.gold}", True, YELLOW)
-        self.screen.blit(gold_text, (SCREEN_WIDTH - 200, 85))
-        
-        # Wave status
-        if not self.wave_active:
-            current_time = pygame.time.get_ticks()
-            time_left = max(0, self.time_between_waves - (current_time - self.wave_start_time))
+        # Draw shop prompt if needed
+        if self.show_shop_prompt:
+            self.draw_shop_prompt()
             
-            if self.current_wave >= self.max_waves:
-                victory_text = self.big_font.render("ARENA COMPLETED!", True, GOLD)
-                text_rect = victory_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
-                self.screen.blit(victory_text, text_rect)
-            else:
-                next_wave_text = self.font.render(f"Next Wave: {time_left // 1000 + 1}s", True, YELLOW)
-                text_rect = next_wave_text.get_rect(center=(SCREEN_WIDTH // 2, 50))
-                self.screen.blit(next_wave_text, text_rect)
-                
-                # Boss wave indicator
-                if (self.current_wave + 1) % self.waves_per_boss == 0:
-                    boss_text = self.font.render("BOSS WAVE INCOMING!", True, RED)
-                    boss_rect = boss_text.get_rect(center=(SCREEN_WIDTH // 2, 75))
-                    self.screen.blit(boss_text, boss_rect)
-
-        # Controls reminder
-        controls_y = 100
-        controls = [
-            "WASD: Move",
-            "Mouse: Look & Shoot", 
-            "SPACE: Jump",
-            "1/2/3: Select Spell",
-            "Right Click: Cycle Spells",
-            "M: Toggle Map"
+        # Draw game over screen if needed
+        if self.game_over:
+            self.draw_game_over_screen()
+            
+    def draw_game_over_screen(self):
+        """Draw game over screen with stats"""
+        # Semi-transparent overlay
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        overlay.set_alpha(180)
+        overlay.fill(BLACK)
+        self.screen.blit(overlay, (0, 0))
+        
+        # Game over box
+        box_width = 500
+        box_height = 300
+        box_x = (SCREEN_WIDTH - box_width) // 2
+        box_y = (SCREEN_HEIGHT - box_height) // 2
+        
+        pygame.draw.rect(self.screen, DARK_RED, (box_x, box_y, box_width, box_height))
+        pygame.draw.rect(self.screen, RED, (box_x, box_y, box_width, box_height), 4)
+        
+        # Game over text
+        time_remaining = (self.game_over_duration - (pygame.time.get_ticks() - self.game_over_timer)) // 1000
+        
+        texts = [
+            "💀 GAME OVER 💀",
+            "",
+            f"Wave Reached: {self.current_wave}",
+            f"Total Score: {self.player.total_score}",
+            f"Gold Earned: {self.player.gold}",
+            f"Highest Wave: {self.player.highest_wave}",
+            "",
+            "Final Stats:",
+            f"Weapon Level: {self.player.weapon_level}",
+            f"Armor Level: {self.player.armor_level}",
+            f"Magic Level: {self.player.spell_level}",
+            "",
+            "Press any key to return to menu",
+            f"Auto-return in {time_remaining}s"
         ]
-
-        for i, control in enumerate(controls):
-            text = self.font.render(control, True, GRAY)
-            self.screen.blit(text, (SCREEN_WIDTH - 250, controls_y + i * 18))
-            
-    def render_2d_map(self):
-        """Render 2D minimap"""
-        map_scale = 15
-        map_offset_x = SCREEN_WIDTH - self.arena_map.width * map_scale - 10
-        map_offset_y = 10
-
-        # Draw map
-        for y in range(self.arena_map.height):
-            for x in range(self.arena_map.width):
-                tile_type = self.arena_map.get_tile(x, y)
-                if tile_type == 1:
-                    color = DARK_BROWN
-                elif tile_type == 2:
-                    color = GRAY
-                else:
-                    color = BLACK
-                    
-                pygame.draw.rect(
-                    self.screen,
-                    color,
-                    (map_offset_x + x * map_scale, map_offset_y + y * map_scale, map_scale, map_scale)
-                )
-
-        # Draw enemies on minimap
-        for enemy in self.enemies:
-            if enemy.alive:
-                enemy_x = map_offset_x + int(enemy.x * map_scale / TILE_SIZE)
-                enemy_y = map_offset_y + int(enemy.y * map_scale / TILE_SIZE)
-                color = {
-                    EnemyType.SKELETON: WHITE,
-                    EnemyType.ORC: GREEN,
-                    EnemyType.TROLL: BROWN,
-                    EnemyType.DEMON: DARK_RED
-                }.get(enemy.enemy_type, RED)
-                pygame.draw.circle(self.screen, color, (enemy_x, enemy_y), 3)
+        
+        for i, text in enumerate(texts):
+            if "GAME OVER" in text:
+                color = RED
+                font = self.large_font
+            elif text in ["Final Stats:", f"Wave Reached: {self.current_wave}"]:
+                color = YELLOW
+                font = self.font
+            elif text.startswith("Total Score:") or text.startswith("Gold Earned:"):
+                color = GOLD
+                font = self.font
+            elif text.startswith("Highest Wave:"):
+                color = WHITE
+                font = self.font
+            elif "Press any key" in text:
+                color = GREEN
+                font = self.small_font
+            elif "Auto-return" in text:
+                color = GRAY
+                font = self.small_font
+            else:
+                color = WHITE
+                font = self.small_font
                 
-        # Draw bosses on minimap
+            if text:  # Skip empty strings
+                text_surface = font.render(text, True, color)
+                text_rect = text_surface.get_rect(center=(SCREEN_WIDTH // 2, box_y + 30 + i * 18))
+                self.screen.blit(text_surface, text_rect)
+            
+    def render_bosses_3d(self):
+        """Render bosses in 3D space (similar to enemies)"""
+        view_bob = int(self.player.z * 0.3)
+        
+        for boss in self.bosses:
+            if not boss.alive:
+                continue
+                
+            dx = boss.x - self.player.x
+            dy = boss.y - self.player.y
+            boss_distance = math.sqrt(dx * dx + dy * dy)
+            
+            if boss_distance < 0.1:
+                continue
+                
+            boss_angle = math.atan2(dy, dx)
+            angle_diff = boss_angle - self.player.angle
+            
+            # Normalize angle difference
+            while angle_diff > math.pi:
+                angle_diff -= 2 * math.pi
+            while angle_diff < -math.pi:
+                angle_diff += 2 * math.pi
+                
+            # Check if boss is in FOV
+            if abs(angle_diff) < HALF_FOV:
+                screen_x = (angle_diff / HALF_FOV) * (SCREEN_WIDTH // 2) + (SCREEN_WIDTH // 2)
+                
+                boss_scale = max(12, int(boss.size * 1200 / (boss_distance + 0.1)))  # Bosses larger than enemies
+                boss_width = boss_scale
+                boss_height = boss_scale * 1.5  # Bosses are taller
+                
+                boss_y = (SCREEN_HEIGHT - boss_height) // 2 + view_bob
+                
+                # Scale the boss image to the calculated size
+                if hasattr(boss, 'image') and boss.image:
+                    scaled_boss = pygame.transform.scale(boss.image, (int(boss_width), int(boss_height)))
+                    
+                    # Apply distance-based darkening
+                    if boss_distance > 150:  # Darken distant bosses
+                        dark_surface = pygame.Surface((int(boss_width), int(boss_height)))
+                        dark_surface.fill((0, 0, 0))
+                        darkness = min(100, int((boss_distance - 150) * 1.5))
+                        dark_surface.set_alpha(darkness)
+                        
+                        boss_rect = (screen_x - boss_width // 2, boss_y, boss_width, boss_height)
+                        self.screen.blit(scaled_boss, boss_rect)
+                        self.screen.blit(dark_surface, boss_rect)
+                    else:
+                        boss_rect = (screen_x - boss_width // 2, boss_y, boss_width, boss_height)
+                        self.screen.blit(scaled_boss, boss_rect)
+                        
+                    # Add rage effect for Orc Chieftain
+                    if hasattr(boss, 'rage_mode') and boss.rage_mode:
+                        rage_rect = pygame.Rect(screen_x - boss_width // 2, boss_y, boss_width, boss_height)
+                        pygame.draw.rect(self.screen, RED, rage_rect, 3)
+                else:
+                    # Fallback to colored rectangle
+                    boss_rect = (
+                        screen_x - boss_width // 2,
+                        boss_y,
+                        boss_width,
+                        boss_height
+                    )
+                    pygame.draw.rect(self.screen, boss.color, boss_rect)
+                
+                # Draw boss name if close enough
+                if boss_distance < 200 and boss_scale > 20:
+                    boss_names = {
+                        BossType.NECROMANCER: "Necromancer",
+                        BossType.ORC_CHIEFTAIN: "Orc Chieftain", 
+                        BossType.ANCIENT_TROLL: "Ancient Troll",
+                        BossType.DEMON_LORD: "Demon Lord"
+                    }
+                    name_text = boss_names.get(boss.boss_type, "Boss")
+                    
+                    name_font = pygame.font.Font(None, max(16, int(boss_scale // 4)))
+                    name_surface = name_font.render(name_text, True, WHITE)
+                    name_rect = name_surface.get_rect(center=(screen_x, boss_y - 20))
+                    
+                    # Draw background for name
+                    bg_rect = name_rect.inflate(6, 4)
+                    pygame.draw.rect(self.screen, BLACK, bg_rect)
+                    pygame.draw.rect(self.screen, boss.color, bg_rect, 2)
+                    
+                    self.screen.blit(name_surface, name_rect)
+            
+    def draw_health_bars(self):
+        """Draw health bars for enemies and bosses"""
+        # Draw enemy health bars
+        for enemy in self.enemies:
+            if enemy.alive and enemy.health < enemy.max_health:
+                self.draw_enemy_health_bar(enemy)
+                
+        # Draw boss health bars
         for boss in self.bosses:
             if boss.alive:
-                boss_x = map_offset_x + int(boss.x * map_scale / TILE_SIZE)
-                boss_y = map_offset_y + int(boss.y * map_scale / TILE_SIZE)
-                pygame.draw.circle(self.screen, GOLD, (boss_x, boss_y), 5)
+                self.draw_boss_health_bar(boss)
+                
+    def draw_enemy_health_bar(self, enemy):
+        """Draw health bar above enemy"""
+        dx = enemy.x - self.player.x
+        dy = enemy.y - self.player.y
+        distance = math.sqrt(dx * dx + dy * dy)
+        
+        if distance > 300:  # Don't show health bars for distant enemies
+            return
+            
+        angle_to_enemy = math.atan2(dy, dx)
+        angle_diff = angle_to_enemy - self.player.angle
+        
+        # Normalize angle
+        while angle_diff > math.pi:
+            angle_diff -= 2 * math.pi
+        while angle_diff < -math.pi:
+            angle_diff += 2 * math.pi
+            
+        if abs(angle_diff) > HALF_FOV:  # Enemy not in view
+            return
+            
+        screen_x = (angle_diff / HALF_FOV) * (SCREEN_WIDTH // 2) + (SCREEN_WIDTH // 2)
+        screen_y = SCREEN_HEIGHT // 2 - int(100 / max(distance / 100, 1))
+        
+        # Health bar dimensions
+        bar_width = 30
+        bar_height = 4
+        bar_x = screen_x - bar_width // 2
+        bar_y = screen_y - 20
+        
+        # Background (red)
+        bg_rect = pygame.Rect(bar_x, bar_y, bar_width, bar_height)
+        pygame.draw.rect(self.screen, RED, bg_rect)
+        
+        # Health (green to red based on health)
+        health_percentage = enemy.health / enemy.max_health
+        if health_percentage > 0.6:
+            health_color = GREEN
+        elif health_percentage > 0.3:
+            health_color = YELLOW
+        else:
+            health_color = RED
+            
+        health_width = int(bar_width * health_percentage)
+        health_rect = pygame.Rect(bar_x, bar_y, health_width, bar_height)
+        pygame.draw.rect(self.screen, health_color, health_rect)
+        
+        # Border
+        pygame.draw.rect(self.screen, WHITE, bg_rect, 1)
+            
+    def draw_ui(self):
+        """Draw arena UI with visual health/mana bars"""
+        # Draw visual health and mana bars at top left
+        self.draw_player_bars()
+        
+        # Player stats text
+        stats_y = 80  # Moved down to make room for bars
+        stats = [
+            f"Wave: {self.current_wave}",
+            f"Gold: {self.player.gold}",
+            f"Score: {self.player.total_score}"
+        ]
+        
+        for i, stat in enumerate(stats):
+            color = WHITE
+            stat_text = self.font.render(stat, True, color)
+            self.screen.blit(stat_text, (10, stats_y + i * 30))
+            
+        # Enemies remaining
+        enemies_remaining = len(self.enemies) + len(self.bosses)
+        if enemies_remaining > 0:
+            enemies_text = f"Enemies: {enemies_remaining}"
+            text_surface = self.font.render(enemies_text, True, RED)
+            self.screen.blit(text_surface, (10, stats_y + len(stats) * 30))
+            
+        # Wave status
+        if self.between_waves:
+            wave_text = f"Wave {self.current_wave} Starting..."
+            text_surface = self.large_font.render(wave_text, True, YELLOW)
+            text_rect = text_surface.get_rect(center=(SCREEN_WIDTH // 2, 100))
+            self.screen.blit(text_surface, text_rect)
+        elif self.boss_wave and len(self.bosses) > 0:  # Only show if boss is actually present
+            boss_text = "BOSS WAVE!"
+            
+            # Add pulsing effect for boss wave announcement
+            pulse = abs(math.sin(pygame.time.get_ticks() * 0.01)) * 0.3 + 0.7
+            scaled_font = pygame.font.Font(None, int(48 * pulse))
+            boss_text_pulsed = scaled_font.render(boss_text, True, RED)
+            text_rect = boss_text_pulsed.get_rect(center=(SCREEN_WIDTH // 2, 80))
+            self.screen.blit(boss_text_pulsed, text_rect)
+            
+        # Current spell display and mouse controls
+        current_time = pygame.time.get_ticks()
+        spell_y = SCREEN_HEIGHT - 120
+        
+        # Current spell indicator
+        current_spell_text = f"Current Spell: {self.player.current_spell.title()}"
+        spell_colors = {
+            "fireball": ORANGE,
+            "lightning": YELLOW,
+            "ice": LIGHT_BLUE,
+            "heal": GREEN,
+            "shield": PURPLE,
+            "teleport": (255, 0, 255)  # Magenta
+        }
+        spell_color = spell_colors.get(self.player.current_spell, WHITE)
+        
+        current_spell_surface = self.font.render(current_spell_text, True, spell_color)
+        self.screen.blit(current_spell_surface, (10, spell_y - 60))
+        
+        # Mana cost for current spell
+        mana_cost = self.player.spell_costs[self.player.current_spell]
+        can_cast = self.player.mana >= mana_cost
+        cost_color = spell_color if can_cast else GRAY
+        
+        cost_text = f"Mana Cost: {mana_cost}"
+        cost_surface = self.small_font.render(cost_text, True, cost_color)
+        self.screen.blit(cost_surface, (10, spell_y - 35))
+        
+        # Mouse control instructions
+        mouse_controls = [
+            "Left Click: Cast Spell",
+            "Right Click: Change Spell"
+        ]
+        
+        for i, control in enumerate(mouse_controls):
+            control_color = spell_color if i == 0 and can_cast else WHITE
+            control_surface = self.small_font.render(control, True, control_color)
+            self.screen.blit(control_surface, (10, spell_y + i * 20))
+        
+        # Available spells list
+        available_spells = self.player.get_available_spells()
+        if len(available_spells) > 1:
+            spells_text = "Available: " + ", ".join([s.title() for s in available_spells])
+            spells_surface = self.small_font.render(spells_text, True, GRAY)
+            self.screen.blit(spells_surface, (10, spell_y + 45))
+            
+        # Controls
+        controls = [
+            "WASD: Move",
+            "Mouse: Look & Cast",
+            "1/2/3: Spells (Alt)",
+            "ESC: Menu"
+        ]
+        
+        for i, control in enumerate(controls):
+            control_text = self.small_font.render(control, True, GRAY)
+            control_rect = control_text.get_rect(right=SCREEN_WIDTH - 10)
+            self.screen.blit(control_text, (control_rect.x, spell_y + i * 22))
 
-        # Draw player on minimap
-        player_x = map_offset_x + int(self.player.x * map_scale / TILE_SIZE)
-        player_y = map_offset_y + int(self.player.y * map_scale / TILE_SIZE)
-        pygame.draw.circle(self.screen, BLUE, (player_x, player_y), 4)
-
-        # Draw player direction
-        end_x = player_x + int(math.cos(self.player.angle) * 12)
-        end_y = player_y + int(math.sin(self.player.angle) * 12)
-        pygame.draw.line(self.screen, BLUE, (player_x, player_y), (end_x, end_y), 2)
+    def draw_player_bars(self):
+        """Draw visual health and mana bars"""
+        bar_x = 10
+        bar_y = 10
+        bar_width = 200
+        bar_height = 25
+        
+        # Health bar
+        health_percentage = self.player.health / self.player.get_max_health()
+        
+        # Health bar background
+        health_bg = pygame.Rect(bar_x, bar_y, bar_width, bar_height)
+        pygame.draw.rect(self.screen, DARK_RED, health_bg)
+        
+        # Health bar fill
+        health_fill_width = int(bar_width * health_percentage)
+        health_fill = pygame.Rect(bar_x, bar_y, health_fill_width, bar_height)
+        
+        # Color based on health level
+        if health_percentage > 0.6:
+            health_color = GREEN
+        elif health_percentage > 0.3:
+            health_color = YELLOW
+        else:
+            health_color = RED
+            
+        pygame.draw.rect(self.screen, health_color, health_fill)
+        
+        # Health bar border
+        pygame.draw.rect(self.screen, WHITE, health_bg, 2)
+        
+        # Health text
+        health_text = f"Health: {int(self.player.health)}/{self.player.get_max_health()}"
+        health_surface = self.small_font.render(health_text, True, WHITE)
+        text_rect = health_surface.get_rect(center=(bar_x + bar_width // 2, bar_y + bar_height // 2))
+        self.screen.blit(health_surface, text_rect)
+        
+        # Mana bar (below health bar)
+        mana_y = bar_y + bar_height + 10
+        mana_percentage = self.player.mana / self.player.get_max_mana()
+        
+        # Mana bar background
+        mana_bg = pygame.Rect(bar_x, mana_y, bar_width, bar_height)
+        pygame.draw.rect(self.screen, (0, 0, 50), mana_bg)  # Dark blue
+        
+        # Mana bar fill
+        mana_fill_width = int(bar_width * mana_percentage)
+        mana_fill = pygame.Rect(bar_x, mana_y, mana_fill_width, bar_height)
+        
+        # Mana color
+        if mana_percentage > 0.6:
+            mana_color = BLUE
+        elif mana_percentage > 0.3:
+            mana_color = (100, 100, 255)  # Light blue
+        else:
+            mana_color = (50, 50, 150)   # Dark blue
+            
+        pygame.draw.rect(self.screen, mana_color, mana_fill)
+        
+        # Mana bar border
+        pygame.draw.rect(self.screen, WHITE, mana_bg, 2)
+        
+        # Mana text
+        mana_text = f"Mana: {int(self.player.mana)}/{self.player.get_max_mana()}"
+        mana_surface = self.small_font.render(mana_text, True, WHITE)
+        text_rect = mana_surface.get_rect(center=(bar_x + bar_width // 2, mana_y + bar_height // 2))
+        self.screen.blit(mana_surface, text_rect)
+            
+    def draw_shop_prompt(self):
+        """Draw shop prompt after boss defeat"""
+        # Semi-transparent overlay
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        overlay.set_alpha(128)
+        overlay.fill(BLACK)
+        self.screen.blit(overlay, (0, 0))
+        
+        # Prompt box
+        box_width = 450
+        box_height = 250
+        box_x = (SCREEN_WIDTH - box_width) // 2
+        box_y = (SCREEN_HEIGHT - box_height) // 2
+        
+        pygame.draw.rect(self.screen, DARK_GRAY, (box_x, box_y, box_width, box_height))
+        pygame.draw.rect(self.screen, GOLD, (box_x, box_y, box_width, box_height), 3)
+        
+        # Text
+        time_remaining = (self.shop_prompt_duration - (pygame.time.get_ticks() - self.shop_prompt_timer)) // 1000
+        
+        texts = [
+            "🎉 BOSS DEFEATED! 🎉",
+            f"Wave {self.current_wave} Complete!",
+            f"Gold Earned: {self.bosses[0].score_value if self.bosses else 'N/A'}",
+            "",
+            "Visit town to buy upgrades?",
+            "• Heal and restore mana",
+            "• Buy better weapons & armor", 
+            "• Upgrade magical abilities",
+            "",
+            "Y - Go to Town",
+            "N - Continue Fighting",
+            "",
+            f"Auto-continue in {time_remaining}s"
+        ]
+        
+        for i, text in enumerate(texts):
+            if "BOSS DEFEATED" in text:
+                color = GOLD
+                font = self.large_font
+            elif "Wave" in text and "Complete" in text:
+                color = GREEN
+                font = self.font
+            elif "Gold Earned" in text:
+                color = YELLOW
+                font = self.small_font
+            elif text in ["Y - Go to Town", "N - Continue Fighting"]:
+                color = YELLOW
+                font = self.font
+            elif text.startswith("•"):
+                color = LIGHT_BLUE
+                font = self.small_font
+            else:
+                color = WHITE
+                font = self.small_font
+                
+            if text:  # Skip empty strings
+                text_surface = font.render(text, True, color)
+                text_rect = text_surface.get_rect(center=(SCREEN_WIDTH // 2, box_y + 25 + i * 18))
+                self.screen.blit(text_surface, text_rect)
+        
+    def draw_boss_health_bar(self, boss):
+        """Draw boss health bar at top of screen"""
+        # Boss health bar is large and prominent at top of screen
+        bar_width = 300
+        bar_height = 20
+        
+        bar_x = (SCREEN_WIDTH - bar_width) // 2
+        bar_y = 20
+        
+        # Background (dark red)
+        bg_rect = pygame.Rect(bar_x, bar_y, bar_width, bar_height)
+        pygame.draw.rect(self.screen, DARK_RED, bg_rect)
+        
+        # Health (color based on health percentage)
+        health_percentage = boss.get_health_percentage()
+        if health_percentage > 0.5:
+            health_color = GREEN
+        elif health_percentage > 0.25:
+            health_color = YELLOW
+        else:
+            health_color = RED
+            
+        health_width = int(bar_width * health_percentage)
+        health_rect = pygame.Rect(bar_x, bar_y, health_width, bar_height)
+        pygame.draw.rect(self.screen, health_color, health_rect)
+        
+        # # Border
+        pygame.draw.rect(self.screen, WHITE, bg_rect, 2)

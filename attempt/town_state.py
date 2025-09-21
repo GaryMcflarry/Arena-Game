@@ -6,13 +6,15 @@ from town_map import TownMap
 
 class NPC:
     """Simple NPC that wanders around town"""
-    def __init__(self, x, y, name, color=BLUE, dialogue=None):
+    def __init__(self, x, y, name, color=BLUE, dialogue=None, texture_key=None):
         self.x = x
         self.y = y
         self.name = name
         self.color = color
         self.size = 12
         self.speed = 15
+        self.texture_key = texture_key  # Key to look up texture in raycaster
+        self.image = None  # Will be set by town state
         
         # Dialogue system
         self.dialogue = dialogue or [f"Greetings, traveler! I am {name}."]
@@ -106,74 +108,100 @@ class TownState:
                 "Business has been good - the townsfolk appreciate quality.",
                 "Have you seen the prices at the weapon shop? Outrageous!",
                 "I've got connections in every major city, you know."
-            ]),
+            ], "gareth"),
             NPC(16 * TILE_SIZE, 3 * TILE_SIZE, "Sister Evangeline", WHITE, [
                 "May the light bless your journey, child.",
                 "I tend to the sick and weary at the temple.",
                 "Prayer and meditation bring peace to troubled souls.",
                 "The healer's shop works wonders, but faith works miracles.",
                 "Have you come seeking spiritual guidance, traveler?"
-            ]),
+            ], "evangeline"),
             NPC(10 * TILE_SIZE, 8 * TILE_SIZE, "Captain Aldric", BROWN, [
                 "Hold there, citizen! State your business in our town.",
                 "The streets are safe under my watch, I assure you.",
                 "That arena sees some fierce battles - are you warrior material?",
                 "I've served this town for twenty years without incident.",
                 "Keep your weapons sheathed while in town, understand?"
-            ]),
+            ], "aldric"),
             NPC(4 * TILE_SIZE, 14 * TILE_SIZE, "Elara the Seamstress", PURPLE, [
                 "Your clothes look travel-worn, dear. Need repairs?",
                 "I can mend tears and patch holes better than anyone!",
                 "This fabric is imported - feel how soft it is!",
                 "Fashion may change, but quality stitching is eternal.",
                 "The merchant Gareth brings me the finest materials."
-            ]),
+            ], "elara"),
             NPC(17 * TILE_SIZE, 10 * TILE_SIZE, "Finn the Blacksmith's Apprentice", (255, 165, 0), [  # Orange
                 "Master says I'm getting better with the hammer!",
                 "Someday I'll forge weapons as fine as his.",
                 "These calluses on my hands are badges of honor!",
                 "The forge fire burns hottest just before dawn.",
                 "Want to see the sword I'm working on? It's almost finished!"
-            ]),
+            ], "finn"),
             NPC(7 * TILE_SIZE, 15 * TILE_SIZE, "Old Willem the Storyteller", GRAY, [
                 "Gather 'round, I've tales that'll curl your toes!",
                 "Did I ever tell you about the dragon of Thornwood Keep?",
                 "In my day, adventurers were made of sterner stuff...",
                 "Every scar has a story, every story has a lesson.",
                 "The young ones don't appreciate a good tale anymore."
-            ]),
+            ], "willem"),
             NPC(14 * TILE_SIZE, 7 * TILE_SIZE, "Meredith the Herbalist", (0, 100, 0), [  # Dark Green
                 "These healing herbs grow wild in the forest nearby.",
                 "Mix three parts willowbark with one part moonbell for headaches.",
                 "Potions are alchemy, but herbs are nature's own magic.",
                 "The healer buys my finest remedies for his shop.",
                 "Careful with that mushroom - it's more dangerous than it looks!"
-            ]),
+            ], "meredith"),
             NPC(3 * TILE_SIZE, 9 * TILE_SIZE, "Sir Roderick the Retired Knight", (192, 192, 192), [  # Silver
                 "These old bones have seen their share of battles.",
                 "I was arena champion for seven consecutive years!",
                 "Honor and valor - that's what knighthood truly means.",
                 "Young fighters today rely too much on magic, not skill.",
                 "My sword arm may be slower, but my wisdom is sharper than ever."
-            ]),
+            ], "roderick"),
             NPC(12 * TILE_SIZE, 2 * TILE_SIZE, "Tobias the Town Crier", YELLOW, [
                 "Hear ye, hear ye! Fresh news from the capital!",
                 "The harvest festival is but a fortnight away!",
                 "Royal decree: all citizens must register their magical items!",
                 "Breaking news: dragon sighted three leagues to the north!",
                 "Town meeting tonight at the square - attendance mandatory!"
-            ]),
+            ], "tobias"),
             NPC(8 * TILE_SIZE, 12 * TILE_SIZE, "Little Margot the Flower Girl", (173, 216, 230), [  # Light Blue
                 "Pretty flowers bring good luck to brave adventurers!",
                 "These daisies were picked fresh this morning!",
                 "Mama says flowers make everything more beautiful.",
                 "The roses are for lovers, but the lilies are for warriors!",
                 "Would you like a flower crown? Only two copper pieces!"
-            ])
+            ], "margot")
         ]
         
         self.font = pygame.font.Font(None, 24)
         self.dialogue_font = pygame.font.Font(None, 20)
+        
+        # Load NPC images from raycaster after it's initialized
+        self.load_npc_images()
+        
+    def load_npc_images(self):
+        """Load NPC images from the raycaster's texture cache"""
+        for npc in self.npcs:
+            if npc.texture_key and npc.texture_key in self.raycaster.textures:
+                npc.image = self.raycaster.textures[npc.texture_key]
+                print(f"Loaded texture for {npc.name}: {npc.texture_key}")
+            else:
+                # Create a fallback colored rectangle with simple face
+                fallback_size = 32
+                npc.image = pygame.Surface((fallback_size, fallback_size))
+                npc.image.fill(npc.color)
+                
+                # Add simple face
+                eye_size = fallback_size // 8
+                left_eye_x = fallback_size // 4
+                right_eye_x = fallback_size * 3 // 4
+                eye_y = fallback_size // 3
+                
+                pygame.draw.circle(npc.image, WHITE, (left_eye_x, eye_y), eye_size)
+                pygame.draw.circle(npc.image, WHITE, (right_eye_x, eye_y), eye_size)
+                
+                print(f"Created fallback image for {npc.name}")
         
     def initialize_town(self):
         """Initialize/reset town state"""
@@ -536,7 +564,7 @@ class TownState:
         self.draw_ui()
         
     def render_npcs(self):
-        """Render NPCs in 3D space"""
+        """Render NPCs in 3D space using their loaded textures"""
         view_bob = int(self.player.z * 0.3)
         
         for npc in self.npcs:
@@ -560,34 +588,56 @@ class TownState:
             if abs(angle_diff) < HALF_FOV:
                 screen_x = (angle_diff / HALF_FOV) * (SCREEN_WIDTH // 2) + (SCREEN_WIDTH // 2)
                 
-                npc_size = npc.size * 800 / (npc_distance + 0.1)
-                npc_height = npc_size * 1.5  # NPCs are taller than wide
+                npc_scale = max(8, int(npc.size * 800 / (npc_distance + 0.1)))
+                npc_width = npc_scale
+                npc_height = npc_scale * 1.5  # NPCs are taller than wide
                 
-                # Draw NPC with jump bob effect
-                npc_rect = (
-                    screen_x - npc_size // 2,
-                    (SCREEN_HEIGHT - npc_height) // 2 + view_bob,
-                    npc_size,
-                    npc_height
-                )
-                pygame.draw.rect(self.screen, npc.color, npc_rect)
+                npc_y = (SCREEN_HEIGHT - npc_height) // 2 + view_bob
                 
-                # Draw simple face
-                if npc_size > 10:
-                    # Eyes
-                    eye_size = max(1, int(npc_size // 8))
-                    left_eye_x = int(screen_x - npc_size // 4)
-                    right_eye_x = int(screen_x + npc_size // 4)
-                    eye_y = int((SCREEN_HEIGHT - npc_height) // 2 + npc_height // 3 + view_bob)
+                # Use texture if available, otherwise fall back to colored rectangle
+                if npc.image:
+                    # Scale the NPC texture to the calculated size
+                    scaled_npc = pygame.transform.scale(npc.image, (int(npc_width), int(npc_height)))
                     
-                    pygame.draw.circle(self.screen, WHITE, (left_eye_x, eye_y), eye_size)
-                    pygame.draw.circle(self.screen, WHITE, (right_eye_x, eye_y), eye_size)
+                    # Apply distance-based darkening
+                    if npc_distance > 100:  # Darken distant NPCs
+                        dark_surface = pygame.Surface((int(npc_width), int(npc_height)))
+                        dark_surface.fill((0, 0, 0))
+                        darkness = min(128, int((npc_distance - 100) * 2))
+                        dark_surface.set_alpha(darkness)
+                        
+                        npc_rect = (screen_x - npc_width // 2, npc_y, npc_width, npc_height)
+                        self.screen.blit(scaled_npc, npc_rect)
+                        self.screen.blit(dark_surface, npc_rect)
+                    else:
+                        npc_rect = (screen_x - npc_width // 2, npc_y, npc_width, npc_height)
+                        self.screen.blit(scaled_npc, npc_rect)
+                else:
+                    # Fallback to colored rectangle with face
+                    npc_rect = (
+                        screen_x - npc_width // 2,
+                        npc_y,
+                        npc_width,
+                        npc_height
+                    )
+                    pygame.draw.rect(self.screen, npc.color, npc_rect)
+                    
+                    # Draw simple face
+                    if npc_scale > 10:
+                        # Eyes
+                        eye_size = max(1, int(npc_scale // 8))
+                        left_eye_x = int(screen_x - npc_width // 4)
+                        right_eye_x = int(screen_x + npc_width // 4)
+                        eye_y = int(npc_y + npc_height // 3)
+                        
+                        pygame.draw.circle(self.screen, WHITE, (left_eye_x, eye_y), eye_size)
+                        pygame.draw.circle(self.screen, WHITE, (right_eye_x, eye_y), eye_size)
                 
                 # Draw name above NPC if close enough
-                if npc_distance < 150 and npc_size > 15:
-                    name_font = pygame.font.Font(None, max(12, int(npc_size // 3)))
+                if npc_distance < 150 and npc_scale > 15:
+                    name_font = pygame.font.Font(None, max(12, int(npc_scale // 3)))
                     name_text = name_font.render(npc.name, True, WHITE)
-                    name_rect = name_text.get_rect(center=(screen_x, npc_rect[1] - 15))
+                    name_rect = name_text.get_rect(center=(screen_x, npc_y - 15))
                     
                     # Draw background for name
                     bg_rect = name_rect.inflate(4, 2)
@@ -639,7 +689,7 @@ class TownState:
             self.draw_dialogue_choices()
             
         # Draw dialogue if active
-        elif self.show_dialogue and self.dialogue_text:  # Fixed: Check if dialogue_text exists
+        elif self.show_dialogue and self.dialogue_text:
             dialogue_y = SCREEN_HEIGHT - 120
             dialogue_rect = pygame.Rect(50, dialogue_y, SCREEN_WIDTH - 100, 60)
             
@@ -733,7 +783,7 @@ class TownState:
         pygame.draw.rect(self.screen, DARK_GRAY, (map_x, map_y, map_size, map_size))
         pygame.draw.rect(self.screen, WHITE, (map_x, map_y, map_size, map_size), 2)
         
-        # Draw map tiles
+        # Draw map tiles with new building colors
         for y in range(min(20, self.town_map.height)):
             for x in range(min(20, self.town_map.width)):
                 if x < self.town_map.width and y < self.town_map.height:
@@ -745,10 +795,14 @@ class TownState:
                             color = BROWN
                         elif tile_type == 2:  # House
                             color = GRAY
-                        elif tile_type in [3, 4, 5]:  # Shops
-                            color = BLUE
+                        elif tile_type == 3:  # Weapon shop
+                            color = DARK_RED
+                        elif tile_type == 4:  # Magic shop
+                            color = PURPLE
+                        elif tile_type == 5:  # Healer
+                            color = WHITE
                         elif tile_type == 6:  # Arena
-                            color = RED
+                            color = GOLD
                             
                         tile_x = map_x + x * map_scale
                         tile_y = map_y + y * map_scale
@@ -778,3 +832,4 @@ class TownState:
             end_x = player_x + int(math.cos(self.player.angle) * 8)
             end_y = player_y + int(math.sin(self.player.angle) * 8)
             pygame.draw.line(self.screen, YELLOW, (player_x, player_y), (end_x, end_y), 2)
+    

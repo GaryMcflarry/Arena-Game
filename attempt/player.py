@@ -37,16 +37,32 @@ class Player:
         self.armor_level = 1   # 1-5
         self.spell_level = 1   # 1-5
         
-        # Spell system
+        # Enhanced spell system
         self.current_spell = "fireball"
-        self.spell_costs = {"fireball": 20, "lightning": 15, "ice": 25}
-        self.spell_cooldowns = {"fireball": 800, "lightning": 500, "ice": 1200}
-        self.last_spell_cast = {"fireball": 0, "lightning": 0, "ice": 0}
+        self.known_spells = ["fireball"]  # Player starts with fireball
+        self.spell_costs = {
+            "fireball": 20,
+            "lightning": 15, 
+            "ice": 25,
+            "heal": 30,
+            "shield": 40,
+            "teleport": 50
+        }
+        # Removed cooldowns - now only mana limits casting
         
         # Arena stats
         self.total_score = 0
         self.highest_wave = 0
         
+    def get_available_spells(self):
+        """Get list of spells the player knows"""
+        return self.known_spells.copy()
+        
+    def learn_spell(self, spell_name):
+        """Learn a new spell"""
+        if spell_name not in self.known_spells:
+            self.known_spells.append(spell_name)
+            
     def get_weapon_damage(self):
         """Get weapon damage based on level"""
         base_damage = 30
@@ -89,19 +105,6 @@ class Player:
         """Restore mana"""
         max_mp = self.get_max_mana()
         self.mana = min(max_mp, self.mana + amount)
-
-    def can_cast_spell(self, spell_type, current_time):
-        """Check if player can cast a spell"""
-        return (self.mana >= self.spell_costs[spell_type] and 
-                current_time - self.last_spell_cast[spell_type] > self.spell_cooldowns[spell_type])
-
-    def cast_spell(self, spell_type, current_time):
-        """Cast a spell if possible"""
-        if self.can_cast_spell(spell_type, current_time):
-            self.mana -= self.spell_costs[spell_type]
-            self.last_spell_cast[spell_type] = current_time
-            return True
-        return False
         
     def spend_gold(self, amount):
         """Spend gold if player has enough"""
