@@ -9,6 +9,9 @@ class ShopState:
         self.game_manager = game_manager
         self.player = player
         
+        # ADD THIS: Sound manager reference
+        self.sound_manager = None
+        
         self.shop_type = None
         self.selected_item = 0
         self.items = []
@@ -110,6 +113,10 @@ class ShopState:
         if not self.player.spend_gold(item["cost"]):
             return  # Not enough gold
             
+        # PLAY SHOP BUY SOUND - ADD THIS!
+        if self.sound_manager:
+            self.sound_manager.play_sound('shop_buy')
+        
         # Apply item effects
         if "level" in item:
             # Upgrade item

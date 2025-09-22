@@ -1,4 +1,5 @@
 import pygame
+import math
 from constants import GameState
 from player import Player
 from town_state import TownState
@@ -9,7 +10,6 @@ from menu_state import MenuState
 class FileSoundManager:
     """Sound manager that loads actual sound files"""
     def __init__(self):
-        print("FileSoundManager: Initializing...")
         try:
             pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
             print(f"FileSoundManager: Mixer initialized: {pygame.mixer.get_init()}")
@@ -17,59 +17,514 @@ class FileSoundManager:
             print(f"FileSoundManager: Mixer init failed: {e}")
         
         self.sounds = {}
+        self.music = {}
+        self.current_music = None
         self.sfx_volume = 0.8
+        self.music_volume = 0.6
+        
         print("FileSoundManager: Loading sound files...")
         self.load_sound_files()
-        print(f"FileSoundManager: Finished - loaded {len(self.sounds)} sounds")
+        print(f"FileSoundManager: Loaded {len(self.sounds)} sounds")
+        
+        print("FileSoundManager: Loading music files...")
+        self.load_music_files()
+        print(f"FileSoundManager: Loaded {len(self.music)} music tracks")
         
     def load_sound_files(self):
-        """Load sound files from assets folder"""
+        """Load sound effect files from assets folder"""
         import os
         
-        # Map game sound names to your available files
-        sound_file_map = {
-            'spell_cast': '../assets/sounds/sfx/flame_spell.mp3',
-            'spell_hit': '../assets/sounds/sfx/flame_spell.mp3',  # Reuse flame spell
-            'heal': '../assets/sounds/sfx/health_spell.mp3',
-            'enemy_hit': '../assets/sounds/sfx/flame_spell.mp3',  # Reuse flame spell
-            'enemy_death': '../assets/sounds/sfx/flame_spell.mp3',  # Reuse flame spell
-            'player_hit': '../assets/sounds/sfx/health_spell.mp3',  # Reuse health spell
-            'boss_spawn': '../assets/sounds/sfx/flame_spell.mp3',  # Reuse flame spell
-            'wave_complete': '../assets/sounds/sfx/health_spell.mp3',  # Reuse health spell
-            'shop_buy': '../assets/sounds/sfx/health_spell.mp3',  # Reuse health spell
-            'menu_select': '../assets/sounds/sfx/flame_spell.mp3',  # Reuse flame spell
-            'teleport': '../assets/sounds/sfx/health_spell.mp3'  # Reuse health spell
+        # First, try to load the actual sound files
+        actual_sounds = {}
+        sound_files = {
+            'flame_spell': '../assets/sounds/sfx/flame_spell.mp3',
+            'health_spell': '../assets/sounds/sfx/health_spell.mp3',
+            'boss_spawn': '../assets/sounds/sfx/boss_spawn.mp3',
+            'enemy_hit': '../assets/sounds/sfx/enemy_hit.mp3',
+            'enemy_death': '../assets/sounds/sfx/enemy_death.mp3',
+            'player_hit': '../assets/sounds/sfx/player_hit.mp3',
+            'wave_complete': '../assets/sounds/sfx/wave_complete.mp3',
+            'shop_buy': '../assets/sounds/sfx/shop_buy.mp3',
+            'menu_select': '../assets/sounds/sfx/menu_select.mp3',
+            'spell_hit': '../assets/sounds/sfx/spell_hit.mp3',
         }
         
-        for sound_name, file_path in sound_file_map.items():
+        for sound_key, file_path in sound_files.items():
             try:
-                print(f"  Loading {sound_name} from {file_path}...")
                 if os.path.exists(file_path):
                     sound = pygame.mixer.Sound(file_path)
                     sound.set_volume(self.sfx_volume)
-                    self.sounds[sound_name] = sound
-                    print(f"  ✓ Loaded {sound_name}")
+                    actual_sounds[sound_key] = sound
+                    print(f"  ✓ Loaded {sound_key} from {file_path}")
                 else:
                     print(f"  ✗ File not found: {file_path}")
             except Exception as e:
-                print(f"  ✗ Failed to load {sound_name}: {e}")
+                print(f"  ✗ Failed to load {sound_key}: {e}")
+        
+        # Map game events to actual sounds (FIXED - moved outside loop)
+        print("FileSoundManager: Mapping game sounds...")
+        
+        # Map available sounds to game events
+        if 'flame_spell' in actual_sounds:
+            self.sounds['spell_cast'] = actual_sounds['flame_spell']
+            print("  ✓ Mapped spell_cast to flame_spell")
+        
+        if 'spell_hit' in actual_sounds:
+            self.sounds['spell_hit'] = actual_sounds['spell_hit']
+            print("  ✓ Mapped spell_hit")
+            
+        if 'enemy_hit' in actual_sounds:
+            self.sounds['enemy_hit'] = actual_sounds['enemy_hit']
+            print("  ✓ Mapped enemy_hit")
+            
+        if 'enemy_death' in actual_sounds:
+            self.sounds['enemy_death'] = actual_sounds['enemy_death']
+            print("  ✓ Mapped enemy_death")
+            
+        if 'boss_spawn' in actual_sounds:
+            self.sounds['boss_spawn'] = actual_sounds['boss_spawn']
+            print("  ✓ Mapped boss_spawn")
+            
+        if 'menu_select' in actual_sounds:
+            self.sounds['menu_select'] = actual_sounds['menu_select']
+            print("  ✓ Mapped menu_select")
+
+        if 'health_spell' in actual_sounds:
+            self.sounds['heal'] = actual_sounds['health_spell']
+            print("  ✓ Mapped heal to health_spell")
+            
+        if 'player_hit' in actual_sounds:
+            self.sounds['player_hit'] = actual_sounds['player_hit']
+            print("  ✓ Mapped player_hit")
+            
+        if 'wave_complete' in actual_sounds:
+            self.sounds['wave_complete'] = actual_sounds['wave_complete']
+            print("  ✓ Mapped wave_complete")
+            
+        if 'shop_buy' in actual_sounds:
+            self.sounds['shop_buy'] = actual_sounds['shop_buy']
+            print("  ✓ Mapped shop_buy")
+        
+        # If no sounds loaded, create fallback placeholder sounds
+        if not self.sounds:
+            print("FileSoundManager: No sound files found, creating placeholders...")
+            self.create_placeholder_sounds()
+
+    def create_placeholder_sounds(self):
+        """Create placeholder sounds that just print messages"""
+        sound_names = [
+            'spell_cast', 'spell_hit', 'enemy_hit', 'enemy_death', 
+            'player_hit', 'boss_spawn', 'wave_complete', 'shop_buy', 
+            'menu_select', 'heal', 'teleport'
+        ]
+        
+        for sound_name in sound_names:
+            # Create a minimal placeholder that tracks the name
+            self.sounds[sound_name] = f"placeholder_{sound_name}"
+            print(f"  ✓ Created placeholder for {sound_name}")
+
+    def load_music_files(self):
+        """Load background music files"""
+        import os
+        
+        # Map game states to music files
+        music_file_map = {
+            'menu': '../assets/sounds/music/menu_theme.mp3',
+            'town': '../assets/sounds/music/town_theme.mp3', 
+            'arena': '../assets/sounds/music/arena_theme.mp3',
+            'shop': '../assets/sounds/music/shop_theme.mp3'
+        }
+        
+        for music_name, file_path in music_file_map.items():
+            try:
+                print(f"  Checking {music_name} music at {file_path}...")
+                if os.path.exists(file_path):
+                    self.music[music_name] = file_path  # Store path, not loaded music
+                    print(f"  ✓ Found {music_name} music")
+                else:
+                    print(f"  ✗ Music file not found: {file_path}")
+            except Exception as e:
+                print(f"  ✗ Failed to check {music_name} music: {e}")
+        
+        # Start menu music if available
+        if 'menu' in self.music:
+            self.play_music('menu')
         
     def play_sound(self, sound_name):
         """Play a sound effect"""
         if sound_name in self.sounds:
             try:
-                self.sounds[sound_name].play()
-                print(f"♪ Playing: {sound_name}")
+                sound = self.sounds[sound_name]
+                if isinstance(sound, str) and sound.startswith("placeholder_"):
+                    # Placeholder sound - just print
+                    print(f"🔊 PLACEHOLDER: {sound_name}")
+                else:
+                    # Real sound - play it
+                    sound.play()
+                    print(f"♪ Playing: {sound_name}")
             except pygame.error as e:
                 print(f"Failed to play {sound_name}: {e}")
         else:
-            print(f"Sound {sound_name} not found in {list(self.sounds.keys())}")
+            print(f"Sound {sound_name} not available")
+
+    def play_music(self, music_name, loop=True):
+        """Play background music"""
+        if music_name in self.music and music_name != self.current_music:
+            try:
+                pygame.mixer.music.load(self.music[music_name])
+                pygame.mixer.music.set_volume(self.music_volume)
+                loops = -1 if loop else 0  # -1 means infinite loop
+                pygame.mixer.music.play(loops)
+                self.current_music = music_name
+                print(f"♫ Playing music: {music_name} (loop: {loop})")
+            except pygame.error as e:
+                print(f"Failed to play music {music_name}: {e}")
+        elif music_name == self.current_music:
+            print(f"Music {music_name} already playing")
+        else:
+            print(f"♫ Would play music: {music_name} (not available)")
+
+    def stop_music(self):
+        """Stop current background music"""
+        pygame.mixer.music.stop()
+        self.current_music = None
+        print("Music stopped")
+
+    def set_music_volume(self, volume):
+        """Set music volume (0.0 to 1.0)"""
+        self.music_volume = max(0.0, min(1.0, volume))
+        pygame.mixer.music.set_volume(self.music_volume)
                 
     def set_sfx_volume(self, volume):
         """Set sound effects volume (0.0 to 1.0)"""
         self.sfx_volume = max(0.0, min(1.0, volume))
         for sound in self.sounds.values():
-            sound.set_volume(self.sfx_volume)
+            if hasattr(sound, 'set_volume'):
+                sound.set_volume(self.sfx_volume)
+
+
+class WorkingSoundManager:
+    """Working sound manager that creates sounds programmatically"""
+    def __init__(self):
+        print("WorkingSoundManager: Initializing...")
+        try:
+            pygame.mixer.pre_init(frequency=22050, size=-16, channels=2, buffer=512)
+            pygame.mixer.init()
+            print(f"WorkingSoundManager: Mixer initialized: {pygame.mixer.get_init()}")
+        except Exception as e:
+            print(f"WorkingSoundManager: Mixer init failed: {e}")
+        
+        self.sounds = {}
+        self.sfx_volume = 0.7
+        self.music_volume = 0.5
+        
+        print("WorkingSoundManager: Creating procedural sounds...")
+        self.create_procedural_sounds()
+        print(f"WorkingSoundManager: Finished - created {len(self.sounds)} sounds")
+        
+        # Start menu music immediately
+        self.start_menu_music()
+        
+    def create_procedural_sounds(self):
+        """Create sounds using pygame's built-in capabilities"""
+        # Create different types of sounds for different game events
+        
+        try:
+            # Spell cast sound - rising tone
+            self.sounds['spell_cast'] = self.create_tone_sequence([440, 550, 660], [100, 100, 100])
+            print("  ✓ Created spell_cast")
+        except:
+            self.sounds['spell_cast'] = None
+            
+        try:
+            # Spell hit - sharp impact
+            self.sounds['spell_hit'] = self.create_noise_burst(200, 0.3)
+            print("  ✓ Created spell_hit")
+        except:
+            self.sounds['spell_hit'] = None
+            
+        try:
+            # Enemy hit - medium impact
+            self.sounds['enemy_hit'] = self.create_noise_burst(150, 0.4)
+            print("  ✓ Created enemy_hit")
+        except:
+            self.sounds['enemy_hit'] = None
+            
+        try:
+            # Enemy death - falling tone
+            self.sounds['enemy_death'] = self.create_tone_sequence([330, 220, 110], [150, 150, 200])
+            print("  ✓ Created enemy_death")
+        except:
+            self.sounds['enemy_death'] = None
+            
+        try:
+            # Player hit - low ominous tone
+            self.sounds['player_hit'] = self.create_noise_burst(300, 0.6)
+            print("  ✓ Created player_hit")
+        except:
+            self.sounds['player_hit'] = None
+            
+        try:
+            # Boss spawn - dramatic chord
+            self.sounds['boss_spawn'] = self.create_tone_sequence([220, 440, 880], [200, 200, 400])
+            print("  ✓ Created boss_spawn")
+        except:
+            self.sounds['boss_spawn'] = None
+            
+        try:
+            # Wave complete - victory fanfare
+            self.sounds['wave_complete'] = self.create_tone_sequence([440, 523, 659, 880], [150, 150, 150, 300])
+            print("  ✓ Created wave_complete")
+        except:
+            self.sounds['wave_complete'] = None
+            
+        try:
+            # Shop buy - pleasant chime
+            self.sounds['shop_buy'] = self.create_tone_sequence([523, 659, 784], [100, 100, 200])
+            print("  ✓ Created shop_buy")
+        except:
+            self.sounds['shop_buy'] = None
+            
+        try:
+            # Menu select - simple beep
+            self.sounds['menu_select'] = self.create_simple_beep(550, 100)
+            print("  ✓ Created menu_select")
+        except:
+            self.sounds['menu_select'] = None
+            
+        try:
+            # Heal - soothing tone
+            self.sounds['heal'] = self.create_tone_sequence([392, 523, 659], [200, 200, 200])
+            print("  ✓ Created heal")
+        except:
+            self.sounds['heal'] = None
+            
+        try:
+            # Teleport - warping sound
+            self.sounds['teleport'] = self.create_tone_sequence([880, 440, 220, 440, 880], [80, 80, 80, 80, 80])
+            print("  ✓ Created teleport")
+        except:
+            self.sounds['teleport'] = None
+    
+    def create_simple_beep(self, frequency, duration_ms):
+        """Create a simple beep using pygame's built-in sound generation"""
+        try:
+            # Use a simpler approach - create raw audio data
+            sample_rate = 22050
+            frames = duration_ms * sample_rate // 1000
+            
+            # Create simple sine wave samples
+            volume = int(self.sfx_volume * 16384)  # 16-bit audio range
+            samples = []
+            
+            for i in range(frames):
+                # Simple sine wave calculation
+                angle = 2.0 * math.pi * frequency * i / sample_rate
+                sample = int(volume * math.sin(angle))
+                
+                # Apply fade-out to prevent clicks
+                fade_factor = 1.0 - (i / frames) * 0.5
+                sample = int(sample * fade_factor)
+                
+                # Stereo samples (left, right)
+                samples.extend([sample, sample])
+            
+            # Convert to bytes and create sound
+            sound_buffer = bytes()
+            for sample in samples:
+                # Convert to 16-bit signed integer bytes
+                if sample > 32767:
+                    sample = 32767
+                elif sample < -32768:
+                    sample = -32768
+                sound_buffer += sample.to_bytes(2, byteorder='little', signed=True)
+            
+            # Create pygame sound from raw buffer
+            sound = pygame.mixer.Sound(buffer=sound_buffer)
+            return sound
+            
+        except Exception as e:
+            print(f"    Failed to create beep: {e}")
+            return None
+    
+    def create_tone_sequence(self, frequencies, durations):
+        """Create a sequence of tones"""
+        try:
+            sample_rate = 22050
+            all_samples = []
+            
+            for freq, duration_ms in zip(frequencies, durations):
+                frames = duration_ms * sample_rate // 1000
+                volume = int(self.sfx_volume * 8192)  # Slightly quieter for sequences
+                
+                for i in range(frames):
+                    angle = 2.0 * math.pi * freq * i / sample_rate
+                    sample = int(volume * math.sin(angle))
+                    
+                    # Apply envelope
+                    envelope = 1.0
+                    if i < frames * 0.1:  # Fade in
+                        envelope = i / (frames * 0.1)
+                    elif i > frames * 0.8:  # Fade out
+                        envelope = (frames - i) / (frames * 0.2)
+                    
+                    sample = int(sample * envelope)
+                    all_samples.extend([sample, sample])
+            
+            # Convert to bytes
+            sound_buffer = bytes()
+            for sample in all_samples:
+                if sample > 32767:
+                    sample = 32767
+                elif sample < -32768:
+                    sample = -32768
+                sound_buffer += sample.to_bytes(2, byteorder='little', signed=True)
+            
+            return pygame.mixer.Sound(buffer=sound_buffer)
+            
+        except Exception as e:
+            print(f"    Failed to create tone sequence: {e}")
+            return None
+    
+    def create_noise_burst(self, duration_ms, intensity=0.5):
+        """Create a noise burst for impact sounds"""
+        try:
+            import random
+            sample_rate = 22050
+            frames = duration_ms * sample_rate // 1000
+            volume = int(self.sfx_volume * intensity * 16384)
+            
+            samples = []
+            for i in range(frames):
+                # Random noise with decay
+                noise = random.randint(-volume, volume)
+                
+                # Apply exponential decay
+                decay = math.exp(-i / (frames * 0.3))
+                sample = int(noise * decay)
+                
+                samples.extend([sample, sample])
+            
+            # Convert to bytes
+            sound_buffer = bytes()
+            for sample in samples:
+                if sample > 32767:
+                    sample = 32767
+                elif sample < -32768:
+                    sample = -32768
+                sound_buffer += sample.to_bytes(2, byteorder='little', signed=True)
+            
+            return pygame.mixer.Sound(buffer=sound_buffer)
+            
+        except Exception as e:
+            print(f"    Failed to create noise burst: {e}")
+            return None
+    
+    def start_menu_music(self):
+        """Start menu music - create a simple looping melody"""
+        try:
+            print("WorkingSoundManager: Starting menu music...")
+            # Create a simple melody that loops
+            menu_melody = self.create_menu_melody()
+            if menu_melody:
+                # Play the melody on loop
+                menu_melody.play(loops=-1)  # Loop forever
+                print("  ✓ Menu music started")
+            else:
+                print("  ✗ Failed to create menu melody")
+        except Exception as e:
+            print(f"  ✗ Failed to start menu music: {e}")
+    
+    def create_menu_melody(self):
+        """Create a simple looping menu melody"""
+        try:
+            # Simple chord progression: C-Am-F-G
+            notes = [
+                (523, 500),  # C
+                (440, 500),  # A
+                (349, 500),  # F
+                (392, 500),  # G
+                (523, 1000), # C (longer)
+            ]
+            
+            sample_rate = 22050
+            all_samples = []
+            
+            for freq, duration_ms in notes:
+                frames = duration_ms * sample_rate // 1000
+                volume = int(self.music_volume * 4096)  # Quieter for background music
+                
+                for i in range(frames):
+                    angle = 2.0 * math.pi * freq * i / sample_rate
+                    # Add some harmonics for richer sound
+                    sample = int(volume * (
+                        0.6 * math.sin(angle) +           # Fundamental
+                        0.3 * math.sin(angle * 2) +       # Octave
+                        0.1 * math.sin(angle * 3)         # Fifth
+                    ))
+                    
+                    # Apply envelope
+                    envelope = 1.0
+                    if i < frames * 0.05:  # Quick fade in
+                        envelope = i / (frames * 0.05)
+                    elif i > frames * 0.9:  # Fade out
+                        envelope = (frames - i) / (frames * 0.1)
+                    
+                    sample = int(sample * envelope)
+                    all_samples.extend([sample, sample])
+                
+                # Add brief silence between notes
+                silence_frames = sample_rate // 20  # 50ms silence
+                for _ in range(silence_frames):
+                    all_samples.extend([0, 0])
+            
+            # Convert to bytes
+            sound_buffer = bytes()
+            for sample in all_samples:
+                if sample > 32767:
+                    sample = 32767
+                elif sample < -32768:
+                    sample = -32768
+                sound_buffer += sample.to_bytes(2, byteorder='little', signed=True)
+            
+            return pygame.mixer.Sound(buffer=sound_buffer)
+            
+        except Exception as e:
+            print(f"    Failed to create menu melody: {e}")
+            return None
+    
+    def play_sound(self, sound_name):
+        """Play a sound effect"""
+        if sound_name in self.sounds and self.sounds[sound_name]:
+            try:
+                self.sounds[sound_name].play()
+                print(f"♪ Played: {sound_name}")
+            except pygame.error as e:
+                print(f"Failed to play {sound_name}: {e}")
+        else:
+            print(f"Sound {sound_name} not available")
+    
+    def play_music(self, music_name):
+        """Play background music (simplified)"""
+        print(f"♫ Would play music: {music_name}")
+        # For now, menu music auto-starts and continues
+        # You could implement different music tracks here
+    
+    def stop_music(self):
+        """Stop all music"""
+        pygame.mixer.stop()
+        print("Music stopped")
+    
+    def set_sfx_volume(self, volume):
+        """Set sound effects volume"""
+        self.sfx_volume = max(0.0, min(1.0, volume))
+        print(f"SFX volume set to {self.sfx_volume}")
+    
+    def set_music_volume(self, volume):
+        """Set music volume"""
+        self.music_volume = max(0.0, min(1.0, volume))
+        print(f"Music volume set to {self.music_volume}")
+
 
 class UltraSimpleSoundManager:
     """Ultra simple sound manager using only basic pygame"""
@@ -92,7 +547,7 @@ class UltraSimpleSoundManager:
         sound_names = [
             'spell_cast', 'spell_hit', 'enemy_hit', 'enemy_death', 
             'player_hit', 'boss_spawn', 'wave_complete', 'shop_buy', 
-            'menu_select', 'teleport'
+            'menu_select', 'teleport', 'heal'
         ]
         
         for sound_name in sound_names:
@@ -114,279 +569,6 @@ class UltraSimpleSoundManager:
         """Set sound effects volume (0.0 to 1.0)"""
         self.sfx_volume = max(0.0, min(1.0, volume))
 
-class SimpleSoundManager:
-    """Simplified sound manager without numpy dependency"""
-    def __init__(self):
-        print("SimpleSoundManager: Initializing...")
-        try:
-            pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
-            print(f"SimpleSoundManager: Mixer initialized: {pygame.mixer.get_init()}")
-        except Exception as e:
-            print(f"SimpleSoundManager: Mixer init failed: {e}")
-        
-        self.sounds = {}
-        self.sfx_volume = 0.8
-        print("SimpleSoundManager: About to create sounds...")
-        self.create_simple_sounds()
-        print(f"SimpleSoundManager: Finished - created {len(self.sounds)} sounds")
-        
-    def create_simple_sounds(self):
-        """Create simple beep sounds without numpy"""
-        print("Creating simple sounds...")
-        sound_configs = {
-            'spell_cast': (440, 300),     # 440Hz for 300ms
-            'spell_hit': (330, 200),      # 330Hz for 200ms  
-            'enemy_hit': (220, 150),      # 220Hz for 150ms
-            'enemy_death': (165, 500),    # 165Hz for 500ms
-            'player_hit': (110, 400),     # 110Hz for 400ms
-            'boss_spawn': (880, 800),     # 880Hz for 800ms
-            'wave_complete': (523, 600),  # 523Hz for 600ms
-            'shop_buy': (660, 250),       # 660Hz for 250ms
-            'menu_select': (550, 100),    # 550Hz for 100ms
-            'teleport': (770, 400)        # 770Hz for 400ms
-        }
-        
-        for sound_name, (frequency, duration) in sound_configs.items():
-            try:
-                print(f"  Creating {sound_name} ({frequency}Hz, {duration}ms)...")
-                self.sounds[sound_name] = self.create_beep(frequency, duration)
-                print(f"  ✓ Created {sound_name}")
-            except Exception as e:
-                print(f"  ✗ Failed to create sound {sound_name}: {e}")
-                import traceback
-                traceback.print_exc()
-                
-    def create_beep(self, frequency, duration_ms):
-        """Create a simple beep sound"""
-        try:
-            sample_rate = 22050
-            frames = duration_ms * sample_rate // 1000
-            
-            print(f"    Creating beep: {frames} frames")
-            
-            # Create simple sine wave approximation using square wave
-            arr = []
-            cycle_length = max(1, sample_rate // frequency)  # Prevent division by zero
-            
-            for i in range(frames):
-                # Simple square wave that approximates sine
-                wave_val = int(4096 * self.sfx_volume) if (i % cycle_length) < (cycle_length // 2) else int(-4096 * self.sfx_volume)
-                # Fade out effect
-                fade_factor = max(0, 1 - (i / frames) * 0.5)
-                wave_val = int(wave_val * fade_factor)
-                arr.append([wave_val, wave_val])  # Stereo
-            
-            print(f"    Created array with {len(arr)} samples")
-            sound = pygame.sndarray.make_sound(arr)
-            print(f"    pygame.sndarray.make_sound successful")
-            return sound
-            
-        except Exception as e:
-            print(f"    create_beep failed: {e}")
-            import traceback
-            traceback.print_exc()
-            raise
-        
-    def play_sound(self, sound_name):
-        """Play a sound effect"""
-        if sound_name in self.sounds:
-            try:
-                self.sounds[sound_name].play()
-                print(f"Played sound: {sound_name}")
-            except pygame.error as e:
-                print(f"Failed to play {sound_name}: {e}")
-        else:
-            print(f"Sound {sound_name} not found in {list(self.sounds.keys())}")
-                
-    def set_sfx_volume(self, volume):
-        """Set sound effects volume (0.0 to 1.0)"""
-        self.sfx_volume = max(0.0, min(1.0, volume))
-
-class SoundManager:
-    """Handles all game sound effects"""
-    def __init__(self):
-        pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
-        self.sounds = {}
-        self.music_volume = 0.7
-        self.sfx_volume = 0.8
-        self.load_sounds()
-        
-    def load_sounds(self):
-        """Load all sound effects with fallback generation"""
-        sound_files = {
-            'spell_cast': 'assets/sounds/spell_cast.wav',
-            'spell_hit': 'assets/sounds/spell_hit.wav', 
-            'enemy_hit': 'assets/sounds/enemy_hit.wav',
-            'enemy_death': 'assets/sounds/enemy_death.wav',
-            'player_hit': 'assets/sounds/player_hit.wav',
-            'boss_spawn': 'assets/sounds/boss_spawn.wav',
-            'wave_complete': 'assets/sounds/wave_complete.wav',
-            'shop_buy': 'assets/sounds/shop_buy.wav',
-            'menu_select': 'assets/sounds/menu_select.wav',
-            'teleport': 'assets/sounds/teleport.wav'
-        }
-        
-        for sound_name, file_path in sound_files.items():
-            try:
-                self.sounds[sound_name] = pygame.mixer.Sound(file_path)
-                self.sounds[sound_name].set_volume(self.sfx_volume)
-            except (pygame.error, FileNotFoundError):
-                # Generate fallback sounds
-                self.sounds[sound_name] = self.generate_fallback_sound(sound_name)
-                
-    def generate_fallback_sound(self, sound_type):
-        """Generate simple procedural sound effects"""
-        try:
-            import numpy as np
-        except ImportError:
-            # If numpy isn't available, create simple beep sounds
-            return self.create_simple_beep(sound_type)
-        
-        sample_rate = 22050
-        
-        if sound_type == 'spell_cast':
-            # Rising pitch whoosh
-            duration = 0.3
-            t = np.linspace(0, duration, int(sample_rate * duration))
-            frequency = 200 + 300 * t / duration
-            wave = np.sin(2 * np.pi * frequency * t) * np.exp(-t * 3)
-            
-        elif sound_type == 'spell_hit':
-            # Sharp impact
-            duration = 0.2
-            t = np.linspace(0, duration, int(sample_rate * duration))
-            wave = np.random.normal(0, 0.3, len(t)) * np.exp(-t * 8)
-            
-        elif sound_type == 'enemy_hit':
-            # Grunt sound
-            duration = 0.15
-            t = np.linspace(0, duration, int(sample_rate * duration))
-            frequency = 150
-            wave = np.sin(2 * np.pi * frequency * t) * np.exp(-t * 5)
-            
-        elif sound_type == 'enemy_death':
-            # Falling pitch
-            duration = 0.5
-            t = np.linspace(0, duration, int(sample_rate * duration))
-            frequency = 300 - 250 * t / duration
-            wave = np.sin(2 * np.pi * frequency * t) * np.exp(-t * 2)
-            
-        elif sound_type == 'player_hit':
-            # Low thud
-            duration = 0.3
-            t = np.linspace(0, duration, int(sample_rate * duration))
-            frequency = 80
-            wave = np.sin(2 * np.pi * frequency * t) * np.exp(-t * 4)
-            
-        elif sound_type == 'boss_spawn':
-            # Dramatic rising chord
-            duration = 1.0
-            t = np.linspace(0, duration, int(sample_rate * duration))
-            freq1 = 100 + 200 * t / duration
-            freq2 = 150 + 300 * t / duration
-            wave = (np.sin(2 * np.pi * freq1 * t) + np.sin(2 * np.pi * freq2 * t)) * 0.5
-            
-        elif sound_type == 'wave_complete':
-            # Victory chime
-            duration = 0.8
-            t = np.linspace(0, duration, int(sample_rate * duration))
-            frequencies = [523, 659, 784]  # C, E, G major chord
-            wave = np.zeros(len(t))
-            for freq in frequencies:
-                wave += np.sin(2 * np.pi * freq * t) * np.exp(-t * 1.5)
-            wave /= len(frequencies)
-            
-        elif sound_type == 'shop_buy':
-            # Coin clink
-            duration = 0.4
-            t = np.linspace(0, duration, int(sample_rate * duration))
-            frequency = 800
-            wave = np.sin(2 * np.pi * frequency * t) * np.exp(-t * 6)
-            
-        elif sound_type == 'menu_select':
-            # Simple beep
-            duration = 0.1
-            t = np.linspace(0, duration, int(sample_rate * duration))
-            frequency = 600
-            wave = np.sin(2 * np.pi * frequency * t)
-            
-        elif sound_type == 'teleport':
-            # Magical sparkle
-            duration = 0.6
-            t = np.linspace(0, duration, int(sample_rate * duration))
-            wave = np.zeros(len(t))
-            for i in range(5):
-                freq = 400 + i * 200
-                phase = i * 0.2
-                wave += np.sin(2 * np.pi * freq * (t + phase)) * np.exp(-(t + phase) * 3)
-            wave /= 5
-            
-        else:
-            # Default beep
-            duration = 0.1
-            t = np.linspace(0, duration, int(sample_rate * duration))
-            wave = np.sin(2 * np.pi * 440 * t)
-        
-        # Normalize and convert to pygame sound
-        wave = np.clip(wave * 32767 * self.sfx_volume, -32767, 32767).astype(np.int16)
-        # Convert mono to stereo
-        stereo_wave = np.array([wave, wave]).T
-        
-        try:
-            sound = pygame.sndarray.make_sound(stereo_wave)
-            return sound
-        except:
-            # Fallback to simple beep if numpy conversion fails
-            return self.create_simple_beep(sound_type)
-    
-    def create_simple_beep(self, sound_type):
-        """Create simple beep sounds without numpy"""
-        # Simple frequency-based sounds
-        frequencies = {
-            'spell_cast': 440,
-            'spell_hit': 330,
-            'enemy_hit': 220,
-            'enemy_death': 165,
-            'player_hit': 110,
-            'boss_spawn': 880,
-            'wave_complete': 523,
-            'shop_buy': 660,
-            'menu_select': 550,
-            'teleport': 770
-        }
-        
-        freq = frequencies.get(sound_type, 440)
-        duration = 200  # milliseconds
-        
-        # Create a simple sine wave beep
-        sample_rate = 22050
-        frames = int(duration * sample_rate / 1000)
-        
-        arr = []
-        for i in range(frames):
-            time_point = float(i) / sample_rate
-            wave_val = int(4096 * self.sfx_volume * 
-                          (1.0 if i < frames // 4 else 
-                           max(0, 1.0 - (i - frames // 4) / (frames * 3 // 4))) *
-                          (1 if int(2 * freq * time_point) % 2 else -1))
-            arr.append([wave_val, wave_val])  # Stereo
-        
-        sound = pygame.sndarray.make_sound(arr)
-        return sound
-        
-    def play_sound(self, sound_name):
-        """Play a sound effect"""
-        if sound_name in self.sounds:
-            try:
-                self.sounds[sound_name].play()
-            except pygame.error:
-                pass  # Ignore sound errors
-                
-    def set_sfx_volume(self, volume):
-        """Set sound effects volume (0.0 to 1.0)"""
-        self.sfx_volume = max(0.0, min(1.0, volume))
-        for sound in self.sounds.values():
-            sound.set_volume(self.sfx_volume)
 
 class GameStateManager:
     def __init__(self, screen):
@@ -394,58 +576,30 @@ class GameStateManager:
         self.current_state = GameState.MENU
         self.states = {}
         
-        # Initialize sound manager with fallback
-        print("=== INITIALIZING SOUND MANAGER ===")
+        # Initialize sound manager - prioritize file loading first
+        print("=== INITIALIZING SOUND SYSTEM ===")
         try:
-            print("1. Trying file-based SoundManager...")
+            print("Attempting to load sound files first...")
             self.sound_manager = FileSoundManager()
-            print(f"File SoundManager created: {self.sound_manager}")
-            if self.sound_manager and hasattr(self.sound_manager, 'sounds'):
-                print(f"File SoundManager has {len(self.sound_manager.sounds)} sounds")
-                if len(self.sound_manager.sounds) > 0:
-                    print("Using file-based sound manager!")
-                else:
-                    raise Exception("File SoundManager created no sounds")
+            print("✓ FileSoundManager initialized successfully")
         except Exception as e:
-            print(f"File SoundManager failed: {e}")
+            print(f"FileSoundManager failed: {e}")
             try:
-                print("2. Trying complex SoundManager...")
-                self.sound_manager = SoundManager()
-                print(f"Complex SoundManager created: {self.sound_manager}")
-                if self.sound_manager and hasattr(self.sound_manager, 'sounds'):
-                    print(f"Complex SoundManager has {len(self.sound_manager.sounds)} sounds")
-                    if len(self.sound_manager.sounds) == 0:
-                        raise Exception("Complex SoundManager created no sounds")
+                print("Falling back to procedural sounds...")
+                self.sound_manager = WorkingSoundManager()
+                print("✓ Fallback to WorkingSoundManager")
             except Exception as e2:
-                print(f"Complex SoundManager also failed: {e2}")
+                print(f"WorkingSoundManager failed: {e2}")
                 try:
-                    print("3. Trying simple SoundManager...")
-                    self.sound_manager = SimpleSoundManager()
-                    print(f"Simple SoundManager created: {self.sound_manager}")
-                    if self.sound_manager and hasattr(self.sound_manager, 'sounds'):
-                        print(f"Simple SoundManager has {len(self.sound_manager.sounds)} sounds")
-                        if len(self.sound_manager.sounds) == 0:
-                            raise Exception("Simple SoundManager created no sounds")
+                    print("Falling back to placeholder sounds...")
+                    self.sound_manager = UltraSimpleSoundManager()
+                    print("✓ Fallback to UltraSimpleSoundManager")
                 except Exception as e3:
-                    print(f"Simple SoundManager also failed: {e3}")
-                    try:
-                        print("4. Trying ultra simple SoundManager...")
-                        self.sound_manager = UltraSimpleSoundManager()
-                        print(f"Ultra simple SoundManager created: {self.sound_manager}")
-                        if self.sound_manager and hasattr(self.sound_manager, 'sounds'):
-                            print(f"Ultra simple SoundManager has {len(self.sound_manager.sounds)} sounds")
-                    except Exception as e4:
-                        print(f"All sound managers failed: {e4}")
-                        import traceback
-                        traceback.print_exc()
-                        self.sound_manager = None
-        
-        print(f"Final sound_manager: {self.sound_manager}")
-        print(f"Sound manager is not None: {self.sound_manager is not None}")
-        print("=== END SOUND MANAGER INIT ===")
+                    print(f"All sound managers failed: {e3}")
+                    self.sound_manager = None
         
         # Initialize player (persistent across states)
-        self.player = Player(400, 300, 0)  # Start in town center
+        self.player = Player(400, 300, 0)
         
         # Initialize all game states
         self.states[GameState.MENU] = MenuState(screen, self)
@@ -453,68 +607,19 @@ class GameStateManager:
         self.states[GameState.ARENA] = ArenaState(screen, self, self.player)
         self.states[GameState.SHOP] = ShopState(screen, self, self.player)
         
-        # Set sound manager for each state with detailed logging
-        print("=== SETTING SOUND MANAGERS ===")
-        for state_name, state in self.states.items():
-            print(f"Checking state {state_name}...")
+        # Set sound manager for each state
+        for state in self.states.values():
             if hasattr(state, 'sound_manager'):
-                print(f"  - Has sound_manager attribute")
-                print(f"  - Before assignment: {getattr(state, 'sound_manager', 'NOT SET')}")
                 state.sound_manager = self.sound_manager
-                print(f"  - After assignment: {getattr(state, 'sound_manager', 'NOT SET')}")
-                print(f"  - Assignment successful: {state.sound_manager is self.sound_manager}")
-                print(f"  - State sound_manager is not None: {state.sound_manager is not None}")
-            else:
-                print(f"  - No sound_manager attribute")
-        print("=== END SETTING SOUND MANAGERS ===")
+                print(f"Set sound manager for {type(state).__name__}")
+        
+        print("=== SOUND SYSTEM SETUP COMPLETE ===")
         
         # Mouse capture settings
         self.mouse_captured = False
         
         # Track arena wave progression
         self.came_from_arena_shop = False
-        
-    def debug_sound_system(self):
-        print("=== SOUND SYSTEM DEBUG ===")
-        print(f"Sound manager exists: {self.sound_manager is not None}")
-        
-        if self.sound_manager:
-            print(f"Pygame mixer info: {pygame.mixer.get_init()}")
-            print(f"Number of sounds loaded: {len(self.sound_manager.sounds)}")
-            print(f"Available sounds: {list(self.sound_manager.sounds.keys())}")
-            
-            # Test basic pygame sound capability
-            try:
-                print("Testing basic pygame sound...")
-                # Create a simple beep
-                duration = 500  # milliseconds
-                sample_rate = 22050
-                frames = duration * sample_rate // 1000
-                
-                # Simple square wave
-                arr = []
-                for i in range(frames):
-                    wave_val = 2000 if (i // 50) % 2 else -2000
-                    arr.append([wave_val, wave_val])  # Stereo
-                
-                test_sound = pygame.sndarray.make_sound(arr)
-                test_sound.play()
-                print("✓ Basic pygame sound test played")
-                
-            except Exception as e:
-                print(f"✗ Basic pygame sound test failed: {e}")
-            
-            # Test our sound manager
-            try:
-                print("Testing sound manager spell_cast...")
-                self.sound_manager.play_sound('spell_cast')
-                print("✓ Sound manager test completed")
-            except Exception as e:
-                print(f"✗ Sound manager test failed: {e}")
-        else:
-            print("✗ Sound manager is None")
-        
-        print("=== END SOUND DEBUG ===")
         
     def play_sound(self, sound_name):
         """Play a sound effect through the sound manager"""
@@ -541,6 +646,17 @@ class GameStateManager:
             self.capture_mouse()
             
         self.current_state = new_state
+        
+        # Start appropriate background music
+        if hasattr(self.sound_manager, 'play_music'):
+            if new_state == GameState.MENU:
+                self.sound_manager.play_music('menu')
+            elif new_state == GameState.TOWN:
+                self.sound_manager.play_music('town') 
+            elif new_state == GameState.ARENA:
+                self.sound_manager.play_music('arena')
+            elif new_state == GameState.SHOP:
+                self.sound_manager.play_music('shop')
         
         # Initialize the new state
         if new_state == GameState.SHOP and shop_type:

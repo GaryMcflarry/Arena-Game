@@ -15,7 +15,7 @@ class Enemy:
                 EnemyType.SKELETON: pygame.image.load("../assets/textures/enemies/skeleton.gif"),
                 EnemyType.ORC: pygame.image.load("../assets/textures/enemies/orc.gif"),
                 EnemyType.TROLL: pygame.image.load("../assets/textures/enemies/troll.gif"),
-                EnemyType.DEMON: pygame.image.load("../assets/textures/enemies/demon.gif"),
+                EnemyType.DEMON: pygame.image.load("../assets/textures/enemies/demon.png"),
             }
         except pygame.error:
             # Create fallback colored squares if images don't exist
@@ -47,7 +47,7 @@ class Enemy:
             self.attack_range = 45
             self.is_ranged = False
         elif enemy_type == EnemyType.ORC:
-            self.health = 120
+            self.health = 100
             self.max_health = 120
             self.speed = 35
             self.attack_damage = 25
@@ -56,7 +56,7 @@ class Enemy:
             self.attack_range = 45
             self.is_ranged = False
         elif enemy_type == EnemyType.TROLL:
-            self.health = 200
+            self.health = 120
             self.max_health = 200
             self.speed = 25
             self.attack_damage = 40

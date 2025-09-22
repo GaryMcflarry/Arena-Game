@@ -25,10 +25,10 @@ class Boss:
             self.is_ranged = True
             self.attack_range = 150
         elif boss_type == BossType.ORC_CHIEFTAIN:
-            self.health = 800  # More health
+            self.health = 500  # More health
             self.max_health = 800
             self.speed = 60  # Moves faster
-            self.attack_damage = 45  # Reduced from 60 - focus on speed not damage
+            self.attack_damage = 20 
             self.color = DARK_GREEN
             self.size = 40
             self.score_value = 200  # Reduced from 375

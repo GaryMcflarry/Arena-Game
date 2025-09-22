@@ -10,17 +10,10 @@ class Spell:
         self.alive = True
         self.sound_manager = sound_manager
         
-        # Play casting sound
-        if self.sound_manager:
-            if spell_type == "teleport":
-                self.sound_manager.play_sound('teleport')
-            else:
-                self.sound_manager.play_sound('spell_cast')
-        
         # Spell-specific properties
         if spell_type == "fireball":
             self.speed = 300
-            self.damage = 60
+            self.damage = 600
             self.color = ORANGE
             self.size = 8
             self.trail_particles = []  # For visual effects

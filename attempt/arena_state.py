@@ -271,15 +271,6 @@ class ArenaState:
             
     def cast_spell(self, spell_type):
         """Cast a spell (no cooldowns, only mana cost)"""
-        if self.sound_manager:
-            print(f"Sound manager has {len(self.sound_manager.sounds)} sounds")
-            print(f"Available sounds: {list(self.sound_manager.sounds.keys())}")
-            print(f"Attempting to play 'spell_cast' sound...")
-        try:
-            self.sound_manager.play_sound('spell_cast')
-            print("✓ play_sound() called successfully")
-        except Exception as e:
-            print(f"✗ play_sound() failed: {e}")
         if self.player.mana >= self.player.spell_costs[spell_type]:
             # Deduct mana cost
             self.player.mana -= self.player.spell_costs[spell_type]
@@ -288,12 +279,12 @@ class ArenaState:
             if spell_type == "heal":
                 heal_amount = 20 * self.player.get_spell_damage_multiplier()
                 self.player.heal(heal_amount)
-                # Play heal sound
+                # Play heal sound but no casting sound
                 if self.sound_manager:
-                    self.sound_manager.play_sound('spell_cast')
+                    self.sound_manager.play_sound('heal')
                 return  # Don't create projectile for heal
             
-            # Create spell projectile for damage spells - PASS SOUND MANAGER
+            # Create spell projectile for damage spells - NO casting sound
             spell = Spell(self.player.x, self.player.y, self.player.angle, spell_type, self.sound_manager)
             # Apply spell level damage multiplier
             spell.damage = int(spell.damage * self.player.get_spell_damage_multiplier())
@@ -634,7 +625,9 @@ class ArenaState:
                 self.draw_boss_health_bar(boss)
                 
     def draw_enemy_health_bar(self, enemy):
-        """Draw health bar above enemy"""
+        """Draw health bar above enemy (simplified 2D version)"""
+        # Calculate screen position (this is simplified - in a real 3D engine you'd project 3D to 2D)
+        # For now, we'll use a simple distance-based approximation
         dx = enemy.x - self.player.x
         dy = enemy.y - self.player.y
         distance = math.sqrt(dx * dx + dy * dy)
@@ -642,6 +635,8 @@ class ArenaState:
         if distance > 300:  # Don't show health bars for distant enemies
             return
             
+        # Simple screen position calculation (this is a placeholder)
+        # In a real implementation, you'd use the raycasting engine's projection
         angle_to_enemy = math.atan2(dy, dx)
         angle_diff = angle_to_enemy - self.player.angle
         
@@ -655,11 +650,12 @@ class ArenaState:
             return
             
         screen_x = (angle_diff / HALF_FOV) * (SCREEN_WIDTH // 2) + (SCREEN_WIDTH // 2)
-        screen_y = SCREEN_HEIGHT // 2 - int(100 / max(distance / 100, 1))
+        screen_y = SCREEN_HEIGHT // 2 - int(100 / max(distance / 100, 1))  # Rough height calculation
         
         # Health bar dimensions
         bar_width = 30
         bar_height = 4
+        
         bar_x = screen_x - bar_width // 2
         bar_y = screen_y - 20
         
@@ -681,7 +677,7 @@ class ArenaState:
         pygame.draw.rect(self.screen, health_color, health_rect)
         
         # Border
-        pygame.draw.rect(self.screen, WHITE, bg_rect, 1)
+        pygame.draw.rect(self.screen, WHITE, bg_rect, 2)
             
     def draw_ui(self):
         """Draw arena UI with visual health/mana bars"""
@@ -938,5 +934,24 @@ class ArenaState:
         health_rect = pygame.Rect(bar_x, bar_y, health_width, bar_height)
         pygame.draw.rect(self.screen, health_color, health_rect)
         
-        # # Border
+        # Border
         pygame.draw.rect(self.screen, WHITE, bg_rect, 2)
+        
+        # Boss name and health text
+        boss_names = {
+            BossType.NECROMANCER: "Necromancer",
+            BossType.ORC_CHIEFTAIN: "Orc Chieftain", 
+            BossType.ANCIENT_TROLL: "Ancient Troll",
+            BossType.DEMON_LORD: "Demon Lord"
+        }
+        name_text = boss_names.get(boss.boss_type, "Boss")
+        
+        # Add rage indicator for Orc Chieftain
+        if boss.boss_type == BossType.ORC_CHIEFTAIN and hasattr(boss, 'rage_mode') and boss.rage_mode:
+            name_text += " (ENRAGED)"
+            
+        health_text = f"{name_text}: {int(boss.health)}/{boss.max_health}"
+        
+        text_surface = self.font.render(health_text, True, WHITE)
+        text_rect = text_surface.get_rect(center=(bar_x + bar_width // 2, bar_y - 15))
+        self.screen.blit(text_surface, text_rect)
