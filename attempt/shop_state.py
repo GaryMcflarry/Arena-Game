@@ -236,7 +236,6 @@ class ShopState:
         controls = [
             "UP/DOWN: Navigate",
             "ENTER/SPACE: Purchase",
-            "ESC: Return to Town"
         ]
         
         controls_y = SCREEN_HEIGHT - 100

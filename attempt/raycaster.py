@@ -51,21 +51,17 @@ class RayCaster:
         # Town textures
         town_textures = {
             # Building walls
-            'town_wall': "assets/textures/town/town_wall.jpeg",
-            'town_house': "assets/textures/town/town_house.png",
+            'town_wall': "../assets/textures/town/town_wall.jpeg",
+            'town_house': "../assets/textures/town/town_house.png",
             
             # Interactive buildings
-            'weapon_shop': "assets/textures/town/weapon_shop.png",
-            'magic_shop': "assets/textures/town/magic_shop.png",
-            'healer_shop': "assets/textures/town/healer_shop.png",
-            'arena_entrance': "assets/textures/town/arena_entrance.png",
-            
-            # Environment
-            'town_ground': "assets/textures/town/town_ground.png",
-            'sky': "assets/textures/town/sky.png"
+            'weapon_shop': "../assets/textures/town/weapon_shop.png",
+            'magic_shop': "../assets/textures/town/magic_shop.png",
+            'healer_shop': "../assets/textures/town/healer_shop.png",
+            'arena_entrance': "../assets/textures/town/arena_entrance.png",
         }
         
-        # NPC textures
+        # NPC textures - expanded for new NPCs
         npc_textures = {
             'gareth': "../assets/textures/npcs/gareth_merchant.png",
             'evangeline': "../assets/textures/npcs/evangeline_sister.png", 
@@ -76,7 +72,13 @@ class RayCaster:
             'meredith': "../assets/textures/npcs/meredith_herbalist.png",
             'roderick': "../assets/textures/npcs/roderick_knight.png",
             'tobias': "../assets/textures/npcs/tobias_crier.png",
-            'margot': "../assets/textures/npcs/margot_flowergirl.png"
+            'margot': "../assets/textures/npcs/margot_flowergirl.png",
+            # New NPCs
+            'bran': "../assets/textures/npcs/bran_baker.png",
+            'clara': "../assets/textures/npcs/clara_scribe.png",
+            'tom': "../assets/textures/npcs/tom_stable.png",
+            'luna': "../assets/textures/npcs/luna_minstrel.png",
+            'erik': "../assets/textures/npcs/erik_guard.png"
         }
         
         print("\n--- Loading Town Textures ---")
@@ -132,23 +134,9 @@ class RayCaster:
             else:
                 print(f"  ✗ {name}: FAILED")
         
-        # Create fallbacks for missing textures - ALWAYS create new floor/ceiling
-        missing_textures = []
-        expected_textures = list(arena_textures.keys()) + list(town_textures.keys()) + list(npc_textures.keys())
-        
-        for expected in expected_textures:
-            if expected not in self.textures or self.textures[expected] is None:
-                missing_textures.append(expected)
-        
-        # ALWAYS create the fallback textures to override floor/ceiling
-        print(f"\n--- Creating/Overriding Floor and Ceiling Textures ---")
+        # Create fallbacks for missing textures
+        print(f"\n--- Creating Fallback Textures ---")
         self.create_fallback_textures()
-        
-        if missing_textures:
-            print(f"Also created fallbacks for missing textures: {missing_textures}")
-        else:
-            print(f"Floor and ceiling textures have been overridden with new colors")
-        
         print("=== END TEXTURE LOADING DEBUG ===\n")
 
     def create_fallback_textures(self):
@@ -215,7 +203,7 @@ class RayCaster:
             self.textures['arena_entrance'].fill(GOLD)  # Gold for arena
             print("  Created fallback: arena_entrance (gold)")
         
-        # NPC fallbacks with their original colors
+        # NPC fallbacks with their original colors + new NPCs
         npc_info = {
             'gareth': GREEN,
             'evangeline': WHITE, 
@@ -226,7 +214,13 @@ class RayCaster:
             'meredith': (0, 100, 0),  # Dark Green
             'roderick': (192, 192, 192),  # Silver
             'tobias': YELLOW,
-            'margot': (173, 216, 230)  # Light Blue
+            'margot': (173, 216, 230),  # Light Blue
+            # New NPCs
+            'bran': (139, 69, 19),  # Brown (baker)
+            'clara': (128, 0, 128),  # Purple (scribe)
+            'tom': (205, 133, 63),  # Peru (stable boy)
+            'luna': (255, 20, 147),  # Deep pink (minstrel)
+            'erik': (47, 79, 79)  # Dark slate gray (guard)
         }
         
         for npc_name, color in npc_info.items():
@@ -289,31 +283,6 @@ class RayCaster:
             texture.set_at((x, y), new_color)
         
         return texture
-
-    def get_texture_column(self, texture, hit_x, hit_y, wall_type):
-        """Extract a vertical column from texture based on hit position"""
-        if not texture:
-            print(f"WARNING: get_texture_column called with None texture for wall_type {wall_type}")
-            return None
-            
-        texture_width = texture.get_width()
-        texture_height = texture.get_height()
-        
-        # Determine which part of the wall was hit for texture mapping
-        # This creates the "sliding" texture effect as you move along walls
-        if wall_type in [1, 2]:  # Arena walls/pillars
-            texture_x = int((hit_x + hit_y) * texture_width) % texture_width
-        else:  # Town buildings
-            texture_x = int((hit_x + hit_y) * texture_width) % texture_width
-            
-        # Extract column
-        try:
-            column = pygame.Surface((1, texture_height))
-            column.blit(texture, (0, 0), (texture_x, 0, 1, texture_height))
-            return column
-        except Exception as e:
-            print(f"ERROR extracting texture column: {e}")
-            return None
 
     def render_textured_floor_ceiling(self, player, view_bob, is_arena=True):
         """Render floor and ceiling with textures"""
@@ -394,18 +363,20 @@ class RayCaster:
         return rays
 
     def render_3d_town(self, rays: List[Tuple[float, float, int, float, float]], player):
-        """Render 3D town environment with textures"""
+        """Render 3D town environment with simple texture tiling - FIXED VERSION"""
         view_bob = int(player.z * 0.3)
 
         # Render floor and ceiling
         self.render_textured_floor_ceiling(player, view_bob, is_arena=False)
 
-        # Walls/buildings with textures
+        # Walls with simple texture tiling
         for i, (depth, ray_angle, wall_type, hit_x, hit_y) in enumerate(rays):
             if wall_type != 0:
                 wall_height = min(SCREEN_HEIGHT, 21000 / max(depth, 1))
+                wall_y = (SCREEN_HEIGHT - wall_height) // 2 + view_bob
+                wall_x = i * 2  # Each ray is 2 pixels wide
 
-                # Get appropriate texture based on wall type
+                # Get texture
                 texture = None
                 if wall_type == 1:  # Town walls
                     texture = self.textures.get('town_wall')
@@ -420,61 +391,53 @@ class RayCaster:
                 elif wall_type == 6:  # Arena entrance
                     texture = self.textures.get('arena_entrance')
                 
-                if texture:
-                    # Get texture column
-                    texture_column = self.get_texture_column(texture, hit_x, hit_y, wall_type)
-                    if texture_column:
-                        # Scale texture column to wall height
-                        scaled_column = pygame.transform.scale(texture_column, (2, int(wall_height)))
+                if texture and wall_height > 0:
+                    # Simple approach: stretch texture to fit wall strip
+                    stretched_texture = pygame.transform.scale(texture, (2, int(wall_height)))
+                    
+                    # Apply distance-based darkening
+                    color_intensity = max(50, 255 - int(depth * 4))
+                    if color_intensity < 255:
+                        # Create darkened version
+                        dark_overlay = pygame.Surface((2, int(wall_height)))
+                        dark_overlay.fill((color_intensity, color_intensity, color_intensity))
                         
-                        # Apply distance-based darkening
-                        color_intensity = max(50, 255 - int(depth * 4))
-                        if color_intensity < 255:
-                            # Create darkened version
-                            dark_surface = pygame.Surface((2, int(wall_height)))
-                            dark_surface.fill((0, 0, 0))
-                            dark_surface.set_alpha(255 - color_intensity)
-                            
-                            wall_y = (SCREEN_HEIGHT - wall_height) // 2 + view_bob
-                            self.screen.blit(scaled_column, (i * 2, wall_y))
-                            self.screen.blit(dark_surface, (i * 2, wall_y))
-                        else:
-                            wall_y = (SCREEN_HEIGHT - wall_height) // 2 + view_bob
-                            self.screen.blit(scaled_column, (i * 2, wall_y))
+                        # Apply darkening
+                        stretched_texture.blit(dark_overlay, (0, 0), special_flags=pygame.BLEND_MULT)
+                    
+                    self.screen.blit(stretched_texture, (wall_x, wall_y))
+                    
                 else:
-                    # Fallback to colored rectangles with distinct colors for each building type
-                    if wall_type == 1:
-                        base_color = BROWN  # Town walls
-                    elif wall_type == 2:
-                        base_color = GRAY  # Houses
-                    elif wall_type == 3:
-                        base_color = DARK_RED  # Weapon shop
-                    elif wall_type == 4:
-                        base_color = PURPLE  # Magic shop
-                    elif wall_type == 5:
-                        base_color = WHITE  # Healer
-                    elif wall_type == 6:
-                        base_color = GOLD  # Arena entrance
-                    else:
-                        base_color = GRAY
+                    # Fallback to colored rectangles
+                    colors = {
+                        1: BROWN,      # Town walls
+                        2: GRAY,       # Houses
+                        3: DARK_RED,   # Weapon shop
+                        4: PURPLE,     # Magic shop
+                        5: WHITE,      # Healer
+                        6: GOLD        # Arena entrance
+                    }
+                    base_color = colors.get(wall_type, GRAY)
                     
                     color_intensity = max(50, 255 - int(depth * 4))
                     wall_color = tuple(int(c * color_intensity / 255) for c in base_color)
-
-                    wall_y = (SCREEN_HEIGHT - wall_height) // 2 + view_bob
-                    pygame.draw.rect(self.screen, wall_color, (i * 2, wall_y, 2, wall_height))
+                    
+                    pygame.draw.rect(self.screen, wall_color, (wall_x, wall_y, 2, wall_height))
 
     def render_3d_arena(self, rays: List[Tuple[float, float, int, float, float]], enemies, spells, player):
-        """Render 3D arena environment with textures"""
+        """Render 3D arena environment with simple texture tiling"""
         view_bob = int(player.z * 0.3)
 
         # Render floor and ceiling
         self.render_textured_floor_ceiling(player, view_bob, is_arena=True)
 
-        # Arena walls with textures
+        # Arena walls with simple texture tiling
         for i, (depth, ray_angle, wall_type, hit_x, hit_y) in enumerate(rays):
             if wall_type != 0:
                 wall_height = min(SCREEN_HEIGHT, 21000 / max(depth, 1))
+                wall_y = max(0, (SCREEN_HEIGHT - wall_height) // 2 + view_bob)
+                wall_x = i * 2
+                actual_wall_height = min(wall_height, SCREEN_HEIGHT - wall_y)
 
                 # Get appropriate texture
                 if wall_type == 1:
@@ -484,44 +447,19 @@ class RayCaster:
                 else:
                     texture = self.textures.get('arena_wall')
 
-                if texture:
-                    # Get texture column
-                    texture_column = self.get_texture_column(texture, hit_x, hit_y, wall_type)
-                    if texture_column:
-                        # Scale texture column to wall height
-                        scaled_column = pygame.transform.scale(texture_column, (2, int(wall_height)))
-                        
-                        # Apply distance-based darkening
-                        color_intensity = max(30, 255 - int(depth * 6))
-                        if color_intensity < 255:
-                            # Create darkened version
-                            dark_surface = pygame.Surface((2, int(wall_height)))
-                            dark_surface.fill((0, 0, 0))
-                            dark_surface.set_alpha(255 - color_intensity)
-                            
-                            wall_y = max(0, (SCREEN_HEIGHT - wall_height) // 2 + view_bob)
-                            wall_height = min(wall_height, SCREEN_HEIGHT - wall_y)
-                            
-                            if wall_height > 0:
-                                # Crop the scaled column if needed
-                                if wall_height < scaled_column.get_height():
-                                    scaled_column = scaled_column.subsurface((0, 0, 2, int(wall_height)))
-                                
-                                self.screen.blit(scaled_column, (i * 2, wall_y))
-                                
-                                # Create corresponding dark surface
-                                dark_surface = pygame.Surface((2, int(wall_height)))
-                                dark_surface.fill((0, 0, 0))
-                                dark_surface.set_alpha(255 - color_intensity)
-                                self.screen.blit(dark_surface, (i * 2, wall_y))
-                        else:
-                            wall_y = max(0, (SCREEN_HEIGHT - wall_height) // 2 + view_bob)
-                            wall_height = min(wall_height, SCREEN_HEIGHT - wall_y)
-                            
-                            if wall_height > 0:
-                                if wall_height < scaled_column.get_height():
-                                    scaled_column = scaled_column.subsurface((0, 0, 2, int(wall_height)))
-                                self.screen.blit(scaled_column, (i * 2, wall_y))
+                if texture and actual_wall_height > 0:
+                    # Simple stretch approach
+                    stretched_texture = pygame.transform.scale(texture, (2, int(actual_wall_height)))
+                    
+                    # Apply distance-based darkening
+                    color_intensity = max(30, 255 - int(depth * 6))
+                    if color_intensity < 255:
+                        dark_overlay = pygame.Surface((2, int(actual_wall_height)))
+                        dark_overlay.fill((color_intensity, color_intensity, color_intensity))
+                        stretched_texture.blit(dark_overlay, (0, 0), special_flags=pygame.BLEND_MULT)
+                    
+                    self.screen.blit(stretched_texture, (wall_x, wall_y))
+                    
                 else:
                     # Fallback to colored rectangles
                     if wall_type == 1:
@@ -534,11 +472,8 @@ class RayCaster:
                     color_intensity = max(30, 255 - int(depth * 6))
                     wall_color = tuple(int(c * color_intensity / 255) for c in base_color)
 
-                    wall_y = max(0, (SCREEN_HEIGHT - wall_height) // 2 + view_bob)
-                    wall_height = min(wall_height, SCREEN_HEIGHT - wall_y)
-
-                    if wall_height > 0:
-                        pygame.draw.rect(self.screen, wall_color, (i * 2, wall_y, 2, wall_height))
+                    if actual_wall_height > 0:
+                        pygame.draw.rect(self.screen, wall_color, (wall_x, wall_y, 2, actual_wall_height))
 
         self.render_spells(spells, view_bob)
         self.render_enemies(player, enemies, view_bob)

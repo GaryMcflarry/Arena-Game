@@ -79,7 +79,6 @@ class MenuState:
         controls = [
             "UP/DOWN: Navigate Menu",
             "ENTER/SPACE: Select",
-            "ESC: Return to Menu (in-game)"
         ]
         
         for i, control in enumerate(controls):

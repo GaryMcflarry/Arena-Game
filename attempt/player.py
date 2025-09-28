@@ -12,10 +12,10 @@ class Player:
         self.rot_speed = 3.0
         
         # Health and mana
-        self.health = 100
-        self.max_health = 100
-        self.mana = 100
-        self.max_mana = 100
+        self.health = 60000000000
+        self.max_health = 6000000000
+        self.mana = 60000
+        self.max_mana = 60000
         self.mana_regen = 20  # per second
         
         # Jump system
@@ -30,7 +30,7 @@ class Player:
         self.mouse_sensitivity = 0.003
         
         # Currency system
-        self.gold = 100  # Starting gold
+        self.gold = 1000000  # Starting gold
         
         # Equipment and upgrades
         self.weapon_level = 1  # 1-5

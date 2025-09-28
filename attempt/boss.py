@@ -3,9 +3,62 @@ import random
 import pygame
 from constants import DARK_GREEN, BossType
 from constants import *
-from enemy import Enemy  # Changed from enhanced_enemy_with_healthbars
+from enemy import Enemy
 
 class Boss:
+    # Class-level (shared) asset cache so we don't reload images every time
+    boss_images = {}
+    
+    @classmethod
+    def load_images(cls):
+        """Load boss images with fallback handling"""
+        try:
+            cls.boss_images = {
+                BossType.NECROMANCER: pygame.image.load("../assets/textures/bosses/necromancer.png"),
+                BossType.ORC_CHIEFTAIN: pygame.image.load("../assets/textures/bosses/orc_chieftan.png"),
+                BossType.ANCIENT_TROLL: pygame.image.load("../assets/textures/bosses/ancient_troll.webp"),
+                BossType.DEMON_LORD: pygame.image.load("../assets/textures/bosses/demon_lord.png"),
+            }
+        except pygame.error:
+            # Create fallback colored squares if images don't exist
+            cls.boss_images = {}
+            colors = {
+                BossType.NECROMANCER: PURPLE,
+                BossType.ORC_CHIEFTAIN: DARK_GREEN,
+                BossType.ANCIENT_TROLL: DARK_BROWN,
+                BossType.DEMON_LORD: DARK_RED
+            }
+            for boss_type, color in colors.items():
+                surface = pygame.Surface((64, 64))
+                surface.fill(color)
+                
+                # Add distinctive features based on boss type
+                if boss_type == BossType.NECROMANCER:
+                    # Purple with white skull-like features
+                    pygame.draw.circle(surface, WHITE, (32, 20), 8)  # Head
+                    pygame.draw.rect(surface, BLACK, (29, 17, 6, 8))  # Eyes
+                    pygame.draw.polygon(surface, BLACK, [(32, 25), (29, 30), (35, 30)])  # Nose
+                elif boss_type == BossType.ORC_CHIEFTAIN:
+                    # Green with war paint
+                    pygame.draw.rect(surface, RED, (0, 16, 64, 8))  # War paint stripe
+                    pygame.draw.circle(surface, YELLOW, (20, 20), 3)  # Eye
+                    pygame.draw.circle(surface, YELLOW, (44, 20), 3)  # Eye
+                elif boss_type == BossType.ANCIENT_TROLL:
+                    # Brown with rocky texture
+                    for i in range(0, 64, 8):
+                        for j in range(0, 64, 8):
+                            if (i + j) % 16 == 0:
+                                pygame.draw.rect(surface, DARK_BROWN, (i, j, 4, 4))
+                elif boss_type == BossType.DEMON_LORD:
+                    # Dark red with flame effects
+                    pygame.draw.circle(surface, ORANGE, (32, 32), 16)  # Inner glow
+                    pygame.draw.circle(surface, RED, (20, 20), 3)  # Eye
+                    pygame.draw.circle(surface, RED, (44, 20), 3)  # Eye
+                    
+                # Add border to make boss stand out
+                pygame.draw.rect(surface, WHITE, (0, 0, 64, 64), 2)
+                cls.boss_images[boss_type] = surface
+
     def __init__(self, x: float, y: float, boss_type: str = BossType.NECROMANCER, arena_state=None):
         self.x = x
         self.y = y
@@ -20,18 +73,18 @@ class Boss:
             self.attack_damage = 40
             self.color = PURPLE
             self.size = 35
-            self.score_value = 150  # Reduced from 250
+            self.score_value = 150
             self.special_ability = "summon_skeletons"
             self.is_ranged = True
             self.attack_range = 150
         elif boss_type == BossType.ORC_CHIEFTAIN:
-            self.health = 500  # More health
+            self.health = 500
             self.max_health = 800
-            self.speed = 60  # Moves faster
+            self.speed = 60
             self.attack_damage = 20 
             self.color = DARK_GREEN
             self.size = 40
-            self.score_value = 200  # Reduced from 375
+            self.score_value = 200
             self.special_ability = "berserker_rage"
             self.is_ranged = False
             self.attack_range = 60
@@ -42,36 +95,36 @@ class Boss:
             self.attack_damage = 80
             self.color = DARK_BROWN
             self.size = 50
-            self.score_value = 300  # Reduced from 500
+            self.score_value = 300
             self.special_ability = "create_decoy"
             self.is_ranged = False
             self.attack_range = 70
             self.is_real = True  # For decoy system
         elif boss_type == BossType.DEMON_LORD:
-            self.health = 1200  # More health
+            self.health = 1200
             self.max_health = 1200
-            self.speed = 70  # Moves fast
+            self.speed = 70
             self.attack_damage = 85
             self.color = DARK_RED
             self.size = 45
-            self.score_value = 450  # Reduced from 750
+            self.score_value = 450
             self.special_ability = "demon_summon"
             self.is_ranged = True
             self.attack_range = 200
             
         # Boss mechanics
         self.last_attack = 0
-        self.attack_cooldown = 1500  # Faster than regular enemies
+        self.attack_cooldown = 1500
         self.alive = True
         
         # Special ability tracking
         self.last_special_ability = 0
         if boss_type == BossType.NECROMANCER:
-            self.special_ability_cooldown = 2000  # 2 seconds for skeleton spawning
+            self.special_ability_cooldown = 2000
         elif boss_type == BossType.DEMON_LORD:
-            self.special_ability_cooldown = 5000  # 5 seconds for demon spawning
+            self.special_ability_cooldown = 5000
         else:
-            self.special_ability_cooldown = 8000  # 8 seconds for other abilities
+            self.special_ability_cooldown = 8000
             
         self.rage_mode = False
         self.rage_end_time = 0
@@ -80,49 +133,20 @@ class Boss:
         self.projectiles = []
         self.projectile_speed = 250
         
-        # Create boss image with placeholder design
-        self.image = self.create_boss_placeholder(self.boss_type, self.size, self.color)
+        # Load and scale boss image
+        if not Boss.boss_images:
+            Boss.load_images()
+            
+        self.image = pygame.transform.scale(
+            Boss.boss_images[self.boss_type], (self.size * 2, self.size * 2)
+        )
         self.rect = self.image.get_rect(center=(self.x, self.y))
         
         # Boss-specific flags
-        self.spawned_minions = False  # For one-time minion spawning
-        self.skeleton_spawn_active = True  # For necromancer
-        
-    def create_boss_placeholder(self, boss_type, size, color):
-        """Create a placeholder image for the boss"""
-        image_size = size * 2
-        surface = pygame.Surface((image_size, image_size))
-        surface.fill(color)
-        
-        # Add distinctive features based on boss type
-        if boss_type == BossType.NECROMANCER:
-            # Purple with white skull-like features
-            pygame.draw.circle(surface, WHITE, (image_size//2, image_size//3), size//4)  # Head
-            pygame.draw.rect(surface, BLACK, (image_size//2 - 3, image_size//3 - 3, 6, 8))  # Eyes
-            pygame.draw.polygon(surface, BLACK, [(image_size//2, image_size//3 + 5), 
-                                               (image_size//2 - 3, image_size//3 + 10),
-                                               (image_size//2 + 3, image_size//3 + 10)])  # Nose
-        elif boss_type == BossType.ORC_CHIEFTAIN:
-            # Green with war paint
-            pygame.draw.rect(surface, RED, (0, image_size//4, image_size, image_size//8))  # War paint stripe
-            pygame.draw.circle(surface, YELLOW, (image_size//3, image_size//3), 3)  # Eye
-            pygame.draw.circle(surface, YELLOW, (2*image_size//3, image_size//3), 3)  # Eye
-        elif boss_type == BossType.ANCIENT_TROLL:
-            # Brown with rocky texture
-            for i in range(0, image_size, 8):
-                for j in range(0, image_size, 8):
-                    if (i + j) % 16 == 0:
-                        pygame.draw.rect(surface, DARK_BROWN, (i, j, 4, 4))
-        elif boss_type == BossType.DEMON_LORD:
-            # Dark red with flame effects
-            pygame.draw.circle(surface, ORANGE, (image_size//2, image_size//2), size//2)  # Inner glow
-            pygame.draw.circle(surface, RED, (image_size//4, image_size//4), 3)  # Eye
-            pygame.draw.circle(surface, RED, (3*image_size//4, image_size//4), 3)  # Eye
-            
-        # Add border to make boss stand out
-        pygame.draw.rect(surface, WHITE, (0, 0, image_size, image_size), 2)
-        
-        return surface
+        self.spawned_minions = False
+        self.skeleton_spawn_active = True
+        self.decoy_troll = None  # Reference to decoy (for real troll)
+        self.real_troll = None   # Reference to real troll (for decoy)
         
     def update(self, player, dt, current_time):
         """Update boss behavior with special abilities"""
@@ -170,6 +194,10 @@ class Boss:
         if not self.arena_state:
             return
             
+        # IMPORTANT: Only real trolls should spawn minions, not decoys
+        if self.boss_type == BossType.ANCIENT_TROLL and not self.is_real:
+            return  # Decoys don't spawn minions
+            
         if self.boss_type == BossType.ORC_CHIEFTAIN:
             # Spawn 3 orc minions
             for _ in range(3):
@@ -177,20 +205,23 @@ class Boss:
                 minion = Enemy(minion_x, minion_y, EnemyType.ORC)
                 self.arena_state.enemies.append(minion)
                 
-        elif self.boss_type == BossType.ANCIENT_TROLL:
+        elif self.boss_type == BossType.ANCIENT_TROLL and self.is_real:  # Only real troll
             # Spawn 4 troll minions  
             for _ in range(4):
                 minion_x, minion_y = self.get_minion_spawn_position()
                 minion = Enemy(minion_x, minion_y, EnemyType.TROLL)
                 self.arena_state.enemies.append(minion)
                 
-            # Create decoy troll
+            # Create decoy troll (ONLY for Ancient Troll)
             decoy_x, decoy_y = self.get_minion_spawn_position()
             decoy = Boss(decoy_x, decoy_y, BossType.ANCIENT_TROLL, self.arena_state)
             decoy.is_real = False  # Mark as decoy
-            decoy.health = 1  # Dies in one hit
-            decoy.max_health = 1
+            decoy.health = 600  # Same health as real troll for display
+            decoy.max_health = 600
             decoy.score_value = 0  # No reward for killing decoy
+            decoy.spawned_minions = True  # PREVENT decoy from spawning more minions
+            decoy.real_troll = self  # Link to real troll
+            self.decoy_troll = decoy  # Link from real troll to decoy
             self.arena_state.bosses.append(decoy)
                 
     def get_minion_spawn_position(self):
@@ -353,10 +384,9 @@ class Boss:
         
     def take_damage(self, damage):
         """Take damage with boss-specific resistances"""
-        # Decoy trolls die instantly
+        # Decoy trolls are invulnerable - they can't take damage
         if self.boss_type == BossType.ANCIENT_TROLL and not self.is_real:
-            self.alive = False
-            return
+            return  # No damage taken, decoy is invulnerable
             
         # Bosses have some damage resistance
         resistance = 0.15  # 15% damage reduction
@@ -365,9 +395,14 @@ class Boss:
         self.health -= actual_damage
         if self.health <= 0:
             self.alive = False
+            
             # Stop skeleton spawning when necromancer dies
             if self.boss_type == BossType.NECROMANCER:
                 self.skeleton_spawn_active = False
+                
+            # Kill decoy when real Ancient Troll dies
+            if self.boss_type == BossType.ANCIENT_TROLL and self.is_real and self.decoy_troll:
+                self.decoy_troll.alive = False
             
         # Trigger rage mode for Orc Chieftain when low on health
         if (self.boss_type == BossType.ORC_CHIEFTAIN and 
