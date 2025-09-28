@@ -67,16 +67,16 @@ class RayCaster:
         
         # NPC textures
         npc_textures = {
-            'gareth': "assets/textures/npcs/gareth_merchant.png",
-            'evangeline': "assets/textures/npcs/evangeline_sister.png", 
-            'aldric': "assets/textures/npcs/aldric_captain.png",
-            'elara': "assets/textures/npcs/elara_seamstress.png",
-            'finn': "assets/textures/npcs/finn_apprentice.png",
-            'willem': "assets/textures/npcs/willem_storyteller.png",
-            'meredith': "assets/textures/npcs/meredith_herbalist.png",
-            'roderick': "assets/textures/npcs/roderick_knight.png",
-            'tobias': "assets/textures/npcs/tobias_crier.png",
-            'margot': "assets/textures/npcs/margot_flowergirl.png"
+            'gareth': "../assets/textures/npcs/gareth_merchant.png",
+            'evangeline': "../assets/textures/npcs/evangeline_sister.png", 
+            'aldric': "../assets/textures/npcs/aldric_captain.png",
+            'elara': "../assets/textures/npcs/elara_seamstress.png",
+            'finn': "../assets/textures/npcs/finn_apprentice.png",
+            'willem': "../assets/textures/npcs/willem_storyteller.png",
+            'meredith': "../assets/textures/npcs/meredith_herbalist.png",
+            'roderick': "../assets/textures/npcs/roderick_knight.png",
+            'tobias': "../assets/textures/npcs/tobias_crier.png",
+            'margot': "../assets/textures/npcs/margot_flowergirl.png"
         }
         
         print("\n--- Loading Town Textures ---")
