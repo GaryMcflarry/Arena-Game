@@ -4,7 +4,6 @@ from constants import *
 
 
 class Enemy:
-    # Class-level (shared) asset cache so we don't reload images every time
     enemy_images = {}
     
     @classmethod
@@ -18,7 +17,6 @@ class Enemy:
                 EnemyType.DEMON: pygame.image.load("../assets/textures/enemies/demon.png"),
             }
         except pygame.error:
-            # Create fallback colored squares if images don't exist
             cls.enemy_images = {}
             colors = {
                 EnemyType.SKELETON: WHITE,
@@ -36,14 +34,13 @@ class Enemy:
         self.y = y
         self.enemy_type = enemy_type
 
-        # Type-specific stats
         if enemy_type == EnemyType.SKELETON:
             self.health = 75
             self.max_health = 75
             self.speed = 40
             self.attack_damage = 15
             self.size = 15
-            self.score_value = 15  # Reduced from 25
+            self.score_value = 15 
             self.attack_range = 45
             self.is_ranged = False
         elif enemy_type == EnemyType.ORC:
@@ -52,7 +49,7 @@ class Enemy:
             self.speed = 35
             self.attack_damage = 25
             self.size = 18
-            self.score_value = 20  # Reduced from 35
+            self.score_value = 20  
             self.attack_range = 45
             self.is_ranged = False
         elif enemy_type == EnemyType.TROLL:
@@ -61,7 +58,7 @@ class Enemy:
             self.speed = 25
             self.attack_damage = 40
             self.size = 25
-            self.score_value = 45  # Reduced from 75
+            self.score_value = 45  
             self.attack_range = 45
             self.is_ranged = False
         elif enemy_type == EnemyType.DEMON:
@@ -70,11 +67,10 @@ class Enemy:
             self.speed = 50
             self.attack_damage = 30
             self.size = 20
-            self.score_value = 60  # Reduced from 100
-            self.attack_range = 120  # Ranged enemy
+            self.score_value = 60  
+            self.attack_range = 120 
             self.is_ranged = True
 
-        # Load and scale enemy image
         if not Enemy.enemy_images:
             Enemy.load_images()
             
@@ -84,10 +80,9 @@ class Enemy:
         self.rect = self.image.get_rect(center=(self.x, self.y))
 
         self.last_attack = 0
-        self.attack_cooldown = 2000  # milliseconds
+        self.attack_cooldown = 2000  
         self.alive = True
         
-        # Ranged attack properties for demons
         self.projectiles = []
         self.projectile_speed = 200
 
@@ -100,27 +95,20 @@ class Enemy:
         dy = player.y - self.y
         distance = math.sqrt(dx * dx + dy * dy)
 
-        # Different behavior for ranged vs melee enemies
         if self.is_ranged:
-            # Ranged enemies (demons) try to maintain distance and shoot
             if distance > self.attack_range:
-                # Move closer if too far
                 self.move_towards_player(player, dt, distance, dx, dy)
             elif distance < 80:
-                # Move away if too close
                 self.move_away_from_player(player, dt, distance, dx, dy)
             
-            # Attack if in range and cooldown ready
             if distance <= self.attack_range and current_time - self.last_attack > self.attack_cooldown:
                 self.ranged_attack(player, current_time)
         else:
-            # Melee enemies move towards player and attack when close
             if distance > self.attack_range:
                 self.move_towards_player(player, dt, distance, dx, dy)
             elif current_time - self.last_attack > self.attack_cooldown:
                 self.melee_attack(player, current_time)
         
-        # Update projectiles for ranged enemies
         if self.is_ranged:
             self.update_projectiles(dt, player)
 
@@ -144,8 +132,7 @@ class Enemy:
             dx /= distance
             dy /= distance
 
-            # Move in opposite direction
-            new_x = self.x - dx * self.speed * 0.5 * dt  # Move slower when retreating
+            new_x = self.x - dx * self.speed * 0.5 * dt 
             new_y = self.y - dy * self.speed * 0.5 * dt
 
             if not self.check_collision(new_x, new_y):
@@ -160,12 +147,10 @@ class Enemy:
 
     def ranged_attack(self, player, current_time):
         """Perform ranged attack by creating a projectile"""
-        # Calculate angle to player
         dx = player.x - self.x
         dy = player.y - self.y
         angle = math.atan2(dy, dx)
         
-        # Create projectile
         projectile = {
             'x': self.x,
             'y': self.y,
@@ -178,25 +163,22 @@ class Enemy:
 
     def update_projectiles(self, dt, player):
         """Update enemy projectiles"""
-        for projectile in self.projectiles[:]:  # Use slice copy to safely modify list
+        for projectile in self.projectiles[:]:  
             if not projectile['alive']:
                 self.projectiles.remove(projectile)
                 continue
                 
-            # Move projectile
             projectile['x'] += math.cos(projectile['angle']) * self.projectile_speed * dt
             projectile['y'] += math.sin(projectile['angle']) * self.projectile_speed * dt
             
-            # Check collision with player
             dx = projectile['x'] - player.x
             dy = projectile['y'] - player.y
             distance = math.sqrt(dx * dx + dy * dy)
             
-            if distance < 20:  # Hit player
+            if distance < 20:  
                 player.take_damage(projectile['damage'])
                 projectile['alive'] = False
                 
-            # Check collision with walls
             elif self.check_collision(projectile['x'], projectile['y']):
                 projectile['alive'] = False
 
@@ -239,6 +221,5 @@ class Enemy:
                 proj_x = int(projectile['x'] - camera_x)
                 proj_y = int(projectile['y'] - camera_y)
                 
-                # Draw projectile as a small red circle
                 pygame.draw.circle(surface, RED, (proj_x, proj_y), 3)
                 pygame.draw.circle(surface, YELLOW, (proj_x, proj_y), 1)

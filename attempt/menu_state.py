@@ -7,7 +7,6 @@ class MenuState:
         self.screen = screen
         self.game_manager = game_manager
         
-        # Menu options
         self.menu_options = [
             ("Enter Town", GameState.TOWN),
             ("Enter Arena", GameState.ARENA),
@@ -37,22 +36,19 @@ class MenuState:
             self.game_manager.change_state(option_action)
             
     def update(self, dt):
-        pass  # No updates needed for menu
+        pass 
         
     def render(self):
         self.screen.fill(BLACK)
         
-        # Draw title
         title_text = self.title_font.render("ARENA OF SHADOWS", True, GOLD)
         title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, 150))
         self.screen.blit(title_text, title_rect)
         
-        # Draw subtitle
         subtitle_text = self.info_font.render("An Elder Scrolls Inspired Adventure", True, SILVER)
         subtitle_rect = subtitle_text.get_rect(center=(SCREEN_WIDTH // 2, 190))
         self.screen.blit(subtitle_text, subtitle_rect)
         
-        # Draw menu options
         start_y = 280
         for i, (option_text, _) in enumerate(self.menu_options):
             color = YELLOW if i == self.selected_option else WHITE
@@ -60,7 +56,6 @@ class MenuState:
             option_rect = option_surface.get_rect(center=(SCREEN_WIDTH // 2, start_y + i * 60))
             self.screen.blit(option_surface, option_rect)
             
-        # Draw player stats
         player = self.game_manager.player
         stats_y = 450
         stats = [
@@ -75,7 +70,6 @@ class MenuState:
             stat_text = self.info_font.render(stat, True, WHITE)
             self.screen.blit(stat_text, (50, stats_y + i * 25))
             
-        # Draw controls
         controls = [
             "UP/DOWN: Navigate Menu",
             "ENTER/SPACE: Select",

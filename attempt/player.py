@@ -11,35 +11,29 @@ class Player:
         self.base_speed = 120
         self.rot_speed = 3.0
         
-        # Health and mana
         self.health = 60000000000
         self.max_health = 6000000000
         self.mana = 60000
         self.max_mana = 60000
-        self.mana_regen = 20  # per second
+        self.mana_regen = 20  
         
-        # Jump system
-        self.z = 0  # Height off ground
+        self.z = 0  
         self.z_velocity = 0
-        self.gravity = 800  # pixels per second squared
-        self.jump_power = 250  # initial upward velocity
+        self.gravity = 800  
+        self.jump_power = 250  
         self.is_jumping = False
         self.can_jump = True
         
-        # Mouse look
         self.mouse_sensitivity = 0.003
         
-        # Currency system
-        self.gold = 1000000  # Starting gold
+        self.gold = 1000000 
         
-        # Equipment and upgrades
-        self.weapon_level = 1  # 1-5
-        self.armor_level = 1   # 1-5
-        self.spell_level = 1   # 1-5
+        self.weapon_level = 1 
+        self.armor_level = 1   
+        self.spell_level = 1   
         
-        # Enhanced spell system
         self.current_spell = "fireball"
-        self.known_spells = ["fireball"]  # Player starts with fireball
+        self.known_spells = ["fireball"] 
         self.spell_costs = {
             "fireball": 20,
             "lightning": 15, 
@@ -48,9 +42,7 @@ class Player:
             "shield": 40,
             "teleport": 50
         }
-        # Removed cooldowns - now only mana limits casting
         
-        # Arena stats
         self.total_score = 0
         self.highest_wave = 0
         
@@ -70,11 +62,11 @@ class Player:
         
     def get_armor_defense(self):
         """Get damage reduction based on armor level"""
-        return (self.armor_level - 1) * 0.1  # 10% reduction per level
+        return (self.armor_level - 1) * 0.1 
         
     def get_spell_damage_multiplier(self):
         """Get spell damage multiplier based on spell level"""
-        return 1.0 + (self.spell_level - 1) * 0.25  # 25% increase per level
+        return 1.0 + (self.spell_level - 1) * 0.25 
         
     def get_max_health(self):
         """Get max health including armor bonus"""
@@ -119,16 +111,13 @@ class Player:
 
     def update(self, dt):
         """Update player state"""
-        # Regenerate mana
         max_mana = self.get_max_mana()
         self.mana = min(max_mana, self.mana + self.mana_regen * dt)
         
-        # Update jump physics
         if self.is_jumping or self.z > 0:
             self.z_velocity -= self.gravity * dt
             self.z += self.z_velocity * dt
             
-            # Land
             if self.z <= 0:
                 self.z = 0
                 self.z_velocity = 0
@@ -164,7 +153,6 @@ class Player:
             dx -= sin_a * current_speed * dt
             dy += cos_a * current_speed * dt
         
-        # Apply movement with collision checking
         if collision_map:
             new_x = self.x + dx
             if not self.check_collision(new_x, self.y, collision_map, map_width, map_height):
@@ -177,13 +165,11 @@ class Player:
             self.x += dx
             self.y += dy
         
-        # Arrow keys for rotation (backup controls)
         if keys[pygame.K_LEFT]:
             self.angle -= self.rot_speed * dt
         if keys[pygame.K_RIGHT]:
             self.angle += self.rot_speed * dt
         
-        # Jump
         if keys[pygame.K_SPACE] and not self.is_jumping:
             self.jump()
         

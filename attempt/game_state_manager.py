@@ -34,7 +34,6 @@ class FileSoundManager:
         """Load sound effect files from assets folder"""
         import os
         
-        # First, try to load the actual sound files
         actual_sounds = {}
         sound_files = {
             'flame_spell': '../assets/sounds/sfx/flame_spell.mp3',
@@ -61,10 +60,8 @@ class FileSoundManager:
             except Exception as e:
                 print(f"  ✗ Failed to load {sound_key}: {e}")
         
-        # Map game events to actual sounds (FIXED - moved outside loop)
         print("FileSoundManager: Mapping game sounds...")
         
-        # Map available sounds to game events
         if 'flame_spell' in actual_sounds:
             self.sounds['spell_cast'] = actual_sounds['flame_spell']
             print("  ✓ Mapped spell_cast to flame_spell")
@@ -105,7 +102,6 @@ class FileSoundManager:
             self.sounds['shop_buy'] = actual_sounds['shop_buy']
             print("  ✓ Mapped shop_buy")
         
-        # If no sounds loaded, create fallback placeholder sounds
         if not self.sounds:
             print("FileSoundManager: No sound files found, creating placeholders...")
             self.create_placeholder_sounds()
@@ -119,7 +115,6 @@ class FileSoundManager:
         ]
         
         for sound_name in sound_names:
-            # Create a minimal placeholder that tracks the name
             self.sounds[sound_name] = f"placeholder_{sound_name}"
             print(f"  ✓ Created placeholder for {sound_name}")
 
@@ -127,7 +122,6 @@ class FileSoundManager:
         """Load background music files"""
         import os
         
-        # Map game states to music files
         music_file_map = {
             'menu': '../assets/sounds/music/menu_theme.mp3',
             'town': '../assets/sounds/music/town_theme.mp3', 
@@ -139,14 +133,13 @@ class FileSoundManager:
             try:
                 print(f"  Checking {music_name} music at {file_path}...")
                 if os.path.exists(file_path):
-                    self.music[music_name] = file_path  # Store path, not loaded music
+                    self.music[music_name] = file_path 
                     print(f"  ✓ Found {music_name} music")
                 else:
                     print(f"  ✗ Music file not found: {file_path}")
             except Exception as e:
                 print(f"  ✗ Failed to check {music_name} music: {e}")
         
-        # Start menu music if available
         if 'menu' in self.music:
             self.play_music('menu')
         
@@ -156,10 +149,8 @@ class FileSoundManager:
             try:
                 sound = self.sounds[sound_name]
                 if isinstance(sound, str) and sound.startswith("placeholder_"):
-                    # Placeholder sound - just print
                     print(f"🔊 PLACEHOLDER: {sound_name}")
                 else:
-                    # Real sound - play it
                     sound.play()
                     print(f"♪ Playing: {sound_name}")
             except pygame.error as e:
@@ -173,7 +164,7 @@ class FileSoundManager:
             try:
                 pygame.mixer.music.load(self.music[music_name])
                 pygame.mixer.music.set_volume(self.music_volume)
-                loops = -1 if loop else 0  # -1 means infinite loop
+                loops = -1 if loop else 0  
                 pygame.mixer.music.play(loops)
                 self.current_music = music_name
                 print(f"♫ Playing music: {music_name} (loop: {loop})")
@@ -222,85 +213,72 @@ class WorkingSoundManager:
         self.create_procedural_sounds()
         print(f"WorkingSoundManager: Finished - created {len(self.sounds)} sounds")
         
-        # Start menu music immediately
         self.start_menu_music()
         
     def create_procedural_sounds(self):
         """Create sounds using pygame's built-in capabilities"""
-        # Create different types of sounds for different game events
         
         try:
-            # Spell cast sound - rising tone
             self.sounds['spell_cast'] = self.create_tone_sequence([440, 550, 660], [100, 100, 100])
             print("  ✓ Created spell_cast")
         except:
             self.sounds['spell_cast'] = None
             
         try:
-            # Spell hit - sharp impact
             self.sounds['spell_hit'] = self.create_noise_burst(200, 0.3)
             print("  ✓ Created spell_hit")
         except:
             self.sounds['spell_hit'] = None
             
         try:
-            # Enemy hit - medium impact
             self.sounds['enemy_hit'] = self.create_noise_burst(150, 0.4)
             print("  ✓ Created enemy_hit")
         except:
             self.sounds['enemy_hit'] = None
             
         try:
-            # Enemy death - falling tone
             self.sounds['enemy_death'] = self.create_tone_sequence([330, 220, 110], [150, 150, 200])
             print("  ✓ Created enemy_death")
         except:
             self.sounds['enemy_death'] = None
             
         try:
-            # Player hit - low ominous tone
             self.sounds['player_hit'] = self.create_noise_burst(300, 0.6)
             print("  ✓ Created player_hit")
         except:
             self.sounds['player_hit'] = None
             
         try:
-            # Boss spawn - dramatic chord
             self.sounds['boss_spawn'] = self.create_tone_sequence([220, 440, 880], [200, 200, 400])
             print("  ✓ Created boss_spawn")
         except:
             self.sounds['boss_spawn'] = None
             
         try:
-            # Wave complete - victory fanfare
             self.sounds['wave_complete'] = self.create_tone_sequence([440, 523, 659, 880], [150, 150, 150, 300])
             print("  ✓ Created wave_complete")
         except:
             self.sounds['wave_complete'] = None
             
         try:
-            # Shop buy - pleasant chime
             self.sounds['shop_buy'] = self.create_tone_sequence([523, 659, 784], [100, 100, 200])
             print("  ✓ Created shop_buy")
         except:
             self.sounds['shop_buy'] = None
             
         try:
-            # Menu select - simple beep
             self.sounds['menu_select'] = self.create_simple_beep(550, 100)
             print("  ✓ Created menu_select")
         except:
             self.sounds['menu_select'] = None
             
         try:
-            # Heal - soothing tone
             self.sounds['heal'] = self.create_tone_sequence([392, 523, 659], [200, 200, 200])
             print("  ✓ Created heal")
         except:
             self.sounds['heal'] = None
             
         try:
-            # Teleport - warping sound
             self.sounds['teleport'] = self.create_tone_sequence([880, 440, 220, 440, 880], [80, 80, 80, 80, 80])
             print("  ✓ Created teleport")
         except:
@@ -309,37 +287,29 @@ class WorkingSoundManager:
     def create_simple_beep(self, frequency, duration_ms):
         """Create a simple beep using pygame's built-in sound generation"""
         try:
-            # Use a simpler approach - create raw audio data
             sample_rate = 22050
             frames = duration_ms * sample_rate // 1000
             
-            # Create simple sine wave samples
-            volume = int(self.sfx_volume * 16384)  # 16-bit audio range
+            volume = int(self.sfx_volume * 16384)  
             samples = []
             
             for i in range(frames):
-                # Simple sine wave calculation
                 angle = 2.0 * math.pi * frequency * i / sample_rate
                 sample = int(volume * math.sin(angle))
                 
-                # Apply fade-out to prevent clicks
                 fade_factor = 1.0 - (i / frames) * 0.5
                 sample = int(sample * fade_factor)
                 
-                # Stereo samples (left, right)
                 samples.extend([sample, sample])
             
-            # Convert to bytes and create sound
             sound_buffer = bytes()
             for sample in samples:
-                # Convert to 16-bit signed integer bytes
                 if sample > 32767:
                     sample = 32767
                 elif sample < -32768:
                     sample = -32768
                 sound_buffer += sample.to_bytes(2, byteorder='little', signed=True)
             
-            # Create pygame sound from raw buffer
             sound = pygame.mixer.Sound(buffer=sound_buffer)
             return sound
             
@@ -355,23 +325,21 @@ class WorkingSoundManager:
             
             for freq, duration_ms in zip(frequencies, durations):
                 frames = duration_ms * sample_rate // 1000
-                volume = int(self.sfx_volume * 8192)  # Slightly quieter for sequences
+                volume = int(self.sfx_volume * 8192) 
                 
                 for i in range(frames):
                     angle = 2.0 * math.pi * freq * i / sample_rate
                     sample = int(volume * math.sin(angle))
                     
-                    # Apply envelope
                     envelope = 1.0
-                    if i < frames * 0.1:  # Fade in
+                    if i < frames * 0.1:  
                         envelope = i / (frames * 0.1)
-                    elif i > frames * 0.8:  # Fade out
+                    elif i > frames * 0.8: 
                         envelope = (frames - i) / (frames * 0.2)
                     
                     sample = int(sample * envelope)
                     all_samples.extend([sample, sample])
             
-            # Convert to bytes
             sound_buffer = bytes()
             for sample in all_samples:
                 if sample > 32767:
@@ -396,16 +364,13 @@ class WorkingSoundManager:
             
             samples = []
             for i in range(frames):
-                # Random noise with decay
                 noise = random.randint(-volume, volume)
                 
-                # Apply exponential decay
                 decay = math.exp(-i / (frames * 0.3))
                 sample = int(noise * decay)
                 
                 samples.extend([sample, sample])
             
-            # Convert to bytes
             sound_buffer = bytes()
             for sample in samples:
                 if sample > 32767:
@@ -424,11 +389,9 @@ class WorkingSoundManager:
         """Start menu music - create a simple looping melody"""
         try:
             print("WorkingSoundManager: Starting menu music...")
-            # Create a simple melody that loops
             menu_melody = self.create_menu_melody()
             if menu_melody:
-                # Play the melody on loop
-                menu_melody.play(loops=-1)  # Loop forever
+                menu_melody.play(loops=-1)  
                 print("  ✓ Menu music started")
             else:
                 print("  ✗ Failed to create menu melody")
@@ -438,13 +401,12 @@ class WorkingSoundManager:
     def create_menu_melody(self):
         """Create a simple looping menu melody"""
         try:
-            # Simple chord progression: C-Am-F-G
             notes = [
-                (523, 500),  # C
-                (440, 500),  # A
-                (349, 500),  # F
-                (392, 500),  # G
-                (523, 1000), # C (longer)
+                (523, 500), 
+                (440, 500),  
+                (349, 500),  
+                (392, 500), 
+                (523, 1000),
             ]
             
             sample_rate = 22050
@@ -452,33 +414,29 @@ class WorkingSoundManager:
             
             for freq, duration_ms in notes:
                 frames = duration_ms * sample_rate // 1000
-                volume = int(self.music_volume * 4096)  # Quieter for background music
+                volume = int(self.music_volume * 4096) 
                 
                 for i in range(frames):
                     angle = 2.0 * math.pi * freq * i / sample_rate
-                    # Add some harmonics for richer sound
                     sample = int(volume * (
-                        0.6 * math.sin(angle) +           # Fundamental
-                        0.3 * math.sin(angle * 2) +       # Octave
-                        0.1 * math.sin(angle * 3)         # Fifth
+                        0.6 * math.sin(angle) +           
+                        0.3 * math.sin(angle * 2) +      
+                        0.1 * math.sin(angle * 3)        
                     ))
                     
-                    # Apply envelope
                     envelope = 1.0
-                    if i < frames * 0.05:  # Quick fade in
+                    if i < frames * 0.05:  
                         envelope = i / (frames * 0.05)
-                    elif i > frames * 0.9:  # Fade out
+                    elif i > frames * 0.9:  
                         envelope = (frames - i) / (frames * 0.1)
                     
                     sample = int(sample * envelope)
                     all_samples.extend([sample, sample])
                 
-                # Add brief silence between notes
-                silence_frames = sample_rate // 20  # 50ms silence
+                silence_frames = sample_rate // 20 
                 for _ in range(silence_frames):
                     all_samples.extend([0, 0])
             
-            # Convert to bytes
             sound_buffer = bytes()
             for sample in all_samples:
                 if sample > 32767:
@@ -507,8 +465,6 @@ class WorkingSoundManager:
     def play_music(self, music_name):
         """Play background music (simplified)"""
         print(f"♫ Would play music: {music_name}")
-        # For now, menu music auto-starts and continues
-        # You could implement different music tracks here
     
     def stop_music(self):
         """Stop all music"""
@@ -552,7 +508,6 @@ class UltraSimpleSoundManager:
         
         for sound_name in sound_names:
             try:
-                # Create a minimal "sound" object that just tracks the name
                 self.sounds[sound_name] = sound_name
                 print(f"  ✓ Created placeholder for {sound_name}")
             except Exception as e:
@@ -576,7 +531,6 @@ class GameStateManager:
         self.current_state = GameState.MENU
         self.states = {}
         
-        # Initialize sound manager - prioritize file loading first
         print("=== INITIALIZING SOUND SYSTEM ===")
         try:
             print("Attempting to load sound files first...")
@@ -598,16 +552,13 @@ class GameStateManager:
                     print(f"All sound managers failed: {e3}")
                     self.sound_manager = None
         
-        # Initialize player (persistent across states)
         self.player = Player(400, 300, 0)
         
-        # Initialize all game states
         self.states[GameState.MENU] = MenuState(screen, self)
         self.states[GameState.TOWN] = TownState(screen, self, self.player)
         self.states[GameState.ARENA] = ArenaState(screen, self, self.player)
         self.states[GameState.SHOP] = ShopState(screen, self, self.player)
         
-        # Set sound manager for each state
         for state in self.states.values():
             if hasattr(state, 'sound_manager'):
                 state.sound_manager = self.sound_manager
@@ -615,10 +566,8 @@ class GameStateManager:
         
         print("=== SOUND SYSTEM SETUP COMPLETE ===")
         
-        # Mouse capture settings
         self.mouse_captured = False
         
-        # Track arena wave progression
         self.came_from_arena_shop = False
         
     def play_sound(self, sound_name):
@@ -628,26 +577,20 @@ class GameStateManager:
         
     def change_state(self, new_state, shop_type=None):
         """Change the current game state"""
-        # Play menu selection sound
         self.play_sound('menu_select')
         
-        # Track if coming from arena for shop after boss fight
         if self.current_state == GameState.ARENA and new_state == GameState.TOWN:
-            # Check if this was from a shop prompt after boss fight
             arena_state = self.states[GameState.ARENA]
             if hasattr(arena_state, 'show_shop_prompt') and arena_state.show_shop_prompt:
                 self.came_from_arena_shop = True
         
-        # Release mouse when going to menu states
         if new_state in [GameState.MENU, GameState.SHOP]:
             self.release_mouse()
-        # Capture mouse for 3D states
         elif new_state in [GameState.TOWN, GameState.ARENA]:
             self.capture_mouse()
             
         self.current_state = new_state
         
-        # Start appropriate background music
         if hasattr(self.sound_manager, 'play_music'):
             if new_state == GameState.MENU:
                 self.sound_manager.play_music('menu')
@@ -658,24 +601,19 @@ class GameStateManager:
             elif new_state == GameState.SHOP:
                 self.sound_manager.play_music('shop')
         
-        # Initialize the new state
         if new_state == GameState.SHOP and shop_type:
             self.states[GameState.SHOP].set_shop_type(shop_type)
         elif new_state == GameState.ARENA:
-            # CRITICAL: Ensure arena has sound manager before initializing
             if hasattr(self.states[GameState.ARENA], 'sound_manager'):
                 self.states[GameState.ARENA].sound_manager = self.sound_manager
                 print(f"Arena sound manager set: {self.states[GameState.ARENA].sound_manager is not None}")
             
             if self.came_from_arena_shop:
-                # Continue from where player left off
                 self.states[GameState.ARENA].continue_from_shop()
                 self.came_from_arena_shop = False
             else:
-                # Fresh start
                 self.states[GameState.ARENA].initialize_arena()
         elif new_state == GameState.TOWN:
-            # Ensure town has sound manager too
             if hasattr(self.states[GameState.TOWN], 'sound_manager'):
                 self.states[GameState.TOWN].sound_manager = self.sound_manager
             self.states[GameState.TOWN].initialize_town()
@@ -692,18 +630,16 @@ class GameStateManager:
         if self.mouse_captured:
             pygame.mouse.set_visible(True)
             pygame.event.set_grab(False)
-            pygame.mouse.set_pos(400, 300)  # Center mouse
+            pygame.mouse.set_pos(400, 300) 
             self.mouse_captured = False
             
     def handle_event(self, event):
         """Handle events for the current state"""
-        # Global ESC handling for town state
         if (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE and 
             self.current_state == GameState.TOWN):
             self.change_state(GameState.MENU)
             return
         
-        # Let current state handle all other events
         current_state_obj = self.states[self.current_state]
         current_state_obj.handle_event(event)
         
@@ -717,7 +653,6 @@ class GameStateManager:
         current_state_obj = self.states[self.current_state]
         current_state_obj.render()
         
-        # Draw crosshair for 3D states
         if self.current_state in [GameState.TOWN, GameState.ARENA]:
             self.draw_crosshair()
         
@@ -730,10 +665,8 @@ class GameStateManager:
         crosshair_thickness = 2
         crosshair_gap = 5
         
-        # Use white with slight transparency for visibility
         crosshair_color = (255, 255, 255)
         
-        # Draw horizontal lines
         pygame.draw.rect(self.screen, crosshair_color, 
                         (center_x - crosshair_size, center_y - crosshair_thickness//2, 
                          crosshair_size - crosshair_gap, crosshair_thickness))
@@ -741,7 +674,6 @@ class GameStateManager:
                         (center_x + crosshair_gap, center_y - crosshair_thickness//2,
                          crosshair_size - crosshair_gap, crosshair_thickness))
         
-        # Draw vertical lines  
         pygame.draw.rect(self.screen, crosshair_color,
                         (center_x - crosshair_thickness//2, center_y - crosshair_size,
                          crosshair_thickness, crosshair_size - crosshair_gap))
@@ -749,7 +681,6 @@ class GameStateManager:
                         (center_x - crosshair_thickness//2, center_y + crosshair_gap,
                          crosshair_thickness, crosshair_size - crosshair_gap))
         
-        # Optional: Draw center dot
         pygame.draw.circle(self.screen, crosshair_color, (center_x, center_y), 1)
         
     def quit_game(self):

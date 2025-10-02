@@ -6,7 +6,6 @@ from constants import *
 from enemy import Enemy
 
 class Boss:
-    # Class-level (shared) asset cache so we don't reload images every time
     boss_images = {}
     
     @classmethod
@@ -20,7 +19,6 @@ class Boss:
                 BossType.DEMON_LORD: pygame.image.load("../assets/textures/bosses/demon_lord.png"),
             }
         except pygame.error:
-            # Create fallback colored squares if images don't exist
             cls.boss_images = {}
             colors = {
                 BossType.NECROMANCER: PURPLE,
@@ -32,30 +30,24 @@ class Boss:
                 surface = pygame.Surface((64, 64))
                 surface.fill(color)
                 
-                # Add distinctive features based on boss type
                 if boss_type == BossType.NECROMANCER:
-                    # Purple with white skull-like features
-                    pygame.draw.circle(surface, WHITE, (32, 20), 8)  # Head
-                    pygame.draw.rect(surface, BLACK, (29, 17, 6, 8))  # Eyes
-                    pygame.draw.polygon(surface, BLACK, [(32, 25), (29, 30), (35, 30)])  # Nose
+                    pygame.draw.circle(surface, WHITE, (32, 20), 8)  
+                    pygame.draw.rect(surface, BLACK, (29, 17, 6, 8))  
+                    pygame.draw.polygon(surface, BLACK, [(32, 25), (29, 30), (35, 30)])  
                 elif boss_type == BossType.ORC_CHIEFTAIN:
-                    # Green with war paint
-                    pygame.draw.rect(surface, RED, (0, 16, 64, 8))  # War paint stripe
-                    pygame.draw.circle(surface, YELLOW, (20, 20), 3)  # Eye
-                    pygame.draw.circle(surface, YELLOW, (44, 20), 3)  # Eye
+                    pygame.draw.rect(surface, RED, (0, 16, 64, 8))
+                    pygame.draw.circle(surface, YELLOW, (20, 20), 3)  
+                    pygame.draw.circle(surface, YELLOW, (44, 20), 3)  
                 elif boss_type == BossType.ANCIENT_TROLL:
-                    # Brown with rocky texture
                     for i in range(0, 64, 8):
                         for j in range(0, 64, 8):
                             if (i + j) % 16 == 0:
                                 pygame.draw.rect(surface, DARK_BROWN, (i, j, 4, 4))
                 elif boss_type == BossType.DEMON_LORD:
-                    # Dark red with flame effects
-                    pygame.draw.circle(surface, ORANGE, (32, 32), 16)  # Inner glow
-                    pygame.draw.circle(surface, RED, (20, 20), 3)  # Eye
-                    pygame.draw.circle(surface, RED, (44, 20), 3)  # Eye
+                    pygame.draw.circle(surface, ORANGE, (32, 32), 16) 
+                    pygame.draw.circle(surface, RED, (20, 20), 3)  
+                    pygame.draw.circle(surface, RED, (44, 20), 3)  
                     
-                # Add border to make boss stand out
                 pygame.draw.rect(surface, WHITE, (0, 0, 64, 64), 2)
                 cls.boss_images[boss_type] = surface
 
@@ -63,9 +55,8 @@ class Boss:
         self.x = x
         self.y = y
         self.boss_type = boss_type
-        self.arena_state = arena_state  # Reference to spawn enemies
+        self.arena_state = arena_state  
         
-        # Base boss stats with enhanced gimmicks
         if boss_type == BossType.NECROMANCER:
             self.health = 300
             self.max_health = 300
@@ -99,7 +90,7 @@ class Boss:
             self.special_ability = "create_decoy"
             self.is_ranged = False
             self.attack_range = 70
-            self.is_real = True  # For decoy system
+            self.is_real = True 
         elif boss_type == BossType.DEMON_LORD:
             self.health = 1200
             self.max_health = 1200
@@ -112,12 +103,10 @@ class Boss:
             self.is_ranged = True
             self.attack_range = 200
             
-        # Boss mechanics
         self.last_attack = 0
         self.attack_cooldown = 1500
         self.alive = True
         
-        # Special ability tracking
         self.last_special_ability = 0
         if boss_type == BossType.NECROMANCER:
             self.special_ability_cooldown = 2000
@@ -129,11 +118,9 @@ class Boss:
         self.rage_mode = False
         self.rage_end_time = 0
         
-        # Ranged attack properties
         self.projectiles = []
         self.projectile_speed = 250
         
-        # Load and scale boss image
         if not Boss.boss_images:
             Boss.load_images()
             
@@ -142,31 +129,26 @@ class Boss:
         )
         self.rect = self.image.get_rect(center=(self.x, self.y))
         
-        # Boss-specific flags
         self.spawned_minions = False
         self.skeleton_spawn_active = True
-        self.decoy_troll = None  # Reference to decoy (for real troll)
-        self.real_troll = None   # Reference to real troll (for decoy)
+        self.decoy_troll = None  
+        self.real_troll = None   
         
     def update(self, player, dt, current_time):
         """Update boss behavior with special abilities"""
         if not self.alive:
             return
             
-        # Update special states
         self.update_special_states(current_time)
         
-        # Use special ability if available
         if current_time - self.last_special_ability > self.special_ability_cooldown:
             self.use_special_ability(player, current_time)
             
-        # Move and attack based on boss type
         dx = player.x - self.x
         dy = player.y - self.y
         distance = math.sqrt(dx * dx + dy * dy)
         
         if self.is_ranged:
-            # Ranged bosses maintain distance and shoot
             if distance > self.attack_range:
                 self.move_towards_player(player, dt, distance, dx, dy)
             elif distance < 100:
@@ -175,16 +157,13 @@ class Boss:
             if distance <= self.attack_range and current_time - self.last_attack > self.attack_cooldown:
                 self.ranged_attack(player, current_time)
         else:
-            # Melee bosses charge at player
             if distance > self.attack_range:
                 self.move_towards_player(player, dt, distance, dx, dy)
             elif current_time - self.last_attack > self.attack_cooldown:
                 self.melee_attack(player, current_time)
         
-        # Update projectiles
         self.update_projectiles(dt, player)
         
-        # Spawn initial minions for certain bosses
         if not self.spawned_minions:
             self.spawn_initial_minions()
             self.spawned_minions = True
@@ -194,34 +173,30 @@ class Boss:
         if not self.arena_state:
             return
             
-        # IMPORTANT: Only real trolls should spawn minions, not decoys
         if self.boss_type == BossType.ANCIENT_TROLL and not self.is_real:
-            return  # Decoys don't spawn minions
+            return  
             
         if self.boss_type == BossType.ORC_CHIEFTAIN:
-            # Spawn 3 orc minions
             for _ in range(3):
                 minion_x, minion_y = self.get_minion_spawn_position()
                 minion = Enemy(minion_x, minion_y, EnemyType.ORC)
                 self.arena_state.enemies.append(minion)
                 
-        elif self.boss_type == BossType.ANCIENT_TROLL and self.is_real:  # Only real troll
-            # Spawn 4 troll minions  
+        elif self.boss_type == BossType.ANCIENT_TROLL and self.is_real:  
             for _ in range(4):
                 minion_x, minion_y = self.get_minion_spawn_position()
                 minion = Enemy(minion_x, minion_y, EnemyType.TROLL)
                 self.arena_state.enemies.append(minion)
                 
-            # Create decoy troll (ONLY for Ancient Troll)
             decoy_x, decoy_y = self.get_minion_spawn_position()
             decoy = Boss(decoy_x, decoy_y, BossType.ANCIENT_TROLL, self.arena_state)
-            decoy.is_real = False  # Mark as decoy
-            decoy.health = 600  # Same health as real troll for display
+            decoy.is_real = False  
+            decoy.health = 600 
             decoy.max_health = 600
-            decoy.score_value = 0  # No reward for killing decoy
-            decoy.spawned_minions = True  # PREVENT decoy from spawning more minions
-            decoy.real_troll = self  # Link to real troll
-            self.decoy_troll = decoy  # Link from real troll to decoy
+            decoy.score_value = 0  
+            decoy.spawned_minions = True  
+            decoy.real_troll = self  
+            self.decoy_troll = decoy  
             self.arena_state.bosses.append(decoy)
                 
     def get_minion_spawn_position(self):
@@ -232,7 +207,6 @@ class Boss:
         x = self.x + math.cos(angle) * distance
         y = self.y + math.sin(angle) * distance
         
-        # Keep within arena bounds
         x = max(100, min(1180, x))
         y = max(100, min(1180, y))
         
@@ -243,7 +217,6 @@ class Boss:
         self.last_special_ability = current_time
         
         if self.special_ability == "summon_skeletons" and self.skeleton_spawn_active:
-            # Necromancer summons 2 skeletons every 2 seconds
             if self.arena_state:
                 for _ in range(2):
                     skeleton_x, skeleton_y = self.get_minion_spawn_position()
@@ -251,7 +224,6 @@ class Boss:
                     self.arena_state.enemies.append(skeleton)
                     
         elif self.special_ability == "demon_summon":
-            # Demon Lord summons 3 demons every 5 seconds
             if self.arena_state:
                 for _ in range(3):
                     demon_x, demon_y = self.get_minion_spawn_position()
@@ -259,12 +231,11 @@ class Boss:
                     self.arena_state.enemies.append(demon)
                     
         elif self.special_ability == "berserker_rage":
-            # Orc Chieftain enters rage mode
             if not self.rage_mode:
                 self.rage_mode = True
-                self.rage_end_time = current_time + 5000  # 5 seconds of rage
-                self.speed *= 1.5  # 50% faster
-                self.attack_damage = int(self.attack_damage * 1.3)  # 30% more damage
+                self.rage_end_time = current_time + 5000 
+                self.speed *= 1.5 
+                self.attack_damage = int(self.attack_damage * 1.3) 
                 
     def move_towards_player(self, player, dt, distance, dx, dy):
         """Move toward player with boss-specific patterns"""
@@ -272,7 +243,6 @@ class Boss:
             dx /= distance
             dy /= distance
             
-            # Apply speed modifiers
             current_speed = self.speed
             if self.rage_mode:
                 current_speed *= 1.5
@@ -280,7 +250,6 @@ class Boss:
             new_x = self.x + dx * current_speed * dt
             new_y = self.y + dy * current_speed * dt
             
-            # Check collision before moving
             if not self.check_collision(new_x, new_y):
                 self.x = new_x
                 self.y = new_y
@@ -310,14 +279,12 @@ class Boss:
 
     def ranged_attack(self, player, current_time):
         """Ranged attack - bosses shoot multiple projectiles"""
-        # Calculate angle to player
         dx = player.x - self.x
         dy = player.y - self.y
         base_angle = math.atan2(dy, dx)
         
-        # Bosses shoot multiple projectiles in a spread
         num_projectiles = 3 if self.boss_type == BossType.DEMON_LORD else 1
-        spread_angle = 0.3  # Radians
+        spread_angle = 0.3  
         
         for i in range(num_projectiles):
             if num_projectiles == 1:
@@ -343,31 +310,27 @@ class Boss:
                 self.projectiles.remove(projectile)
                 continue
                 
-            # Move projectile
             projectile['x'] += math.cos(projectile['angle']) * self.projectile_speed * dt
             projectile['y'] += math.sin(projectile['angle']) * self.projectile_speed * dt
             
-            # Check collision with player
             dx = projectile['x'] - player.x
             dy = projectile['y'] - player.y
             distance = math.sqrt(dx * dx + dy * dy)
             
-            if distance < 25:  # Hit player
+            if distance < 25: 
                 player.take_damage(projectile['damage'])
                 projectile['alive'] = False
                 
-            # Check collision with walls
             elif self.check_collision(projectile['x'], projectile['y']):
                 projectile['alive'] = False
                 
     def update_special_states(self, current_time):
         """Update special boss states"""
-        # Handle rage mode for Orc Chieftain
         if self.boss_type == BossType.ORC_CHIEFTAIN and self.rage_mode:
             if current_time > self.rage_end_time:
                 self.rage_mode = False
-                self.speed = 60  # Return to normal speed
-                self.attack_damage = 60  # Return to normal damage
+                self.speed = 60  
+                self.attack_damage = 60  
                 
     def check_collision(self, x: float, y: float) -> bool:
         """Check collision with arena walls"""
@@ -384,27 +347,22 @@ class Boss:
         
     def take_damage(self, damage):
         """Take damage with boss-specific resistances"""
-        # Decoy trolls are invulnerable - they can't take damage
         if self.boss_type == BossType.ANCIENT_TROLL and not self.is_real:
-            return  # No damage taken, decoy is invulnerable
+            return  
             
-        # Bosses have some damage resistance
-        resistance = 0.15  # 15% damage reduction
+        resistance = 0.15  
         actual_damage = damage * (1 - resistance)
         
         self.health -= actual_damage
         if self.health <= 0:
             self.alive = False
             
-            # Stop skeleton spawning when necromancer dies
             if self.boss_type == BossType.NECROMANCER:
                 self.skeleton_spawn_active = False
                 
-            # Kill decoy when real Ancient Troll dies
             if self.boss_type == BossType.ANCIENT_TROLL and self.is_real and self.decoy_troll:
                 self.decoy_troll.alive = False
             
-        # Trigger rage mode for Orc Chieftain when low on health
         if (self.boss_type == BossType.ORC_CHIEFTAIN and 
             self.health < self.max_health * 0.3 and 
             not self.rage_mode):
@@ -426,14 +384,10 @@ class Boss:
         if self.alive:
             surface.blit(self.image, self.rect)
             
-            # Draw special effects
             if self.rage_mode:
-                # Red outline for rage mode
                 pygame.draw.rect(surface, RED, self.rect, 3)
                 
-            # Draw decoy indicator
             if self.boss_type == BossType.ANCIENT_TROLL and not self.is_real:
-                # Slightly transparent for decoy
                 alpha_surface = pygame.Surface(self.image.get_size())
                 alpha_surface.set_alpha(180)
                 alpha_surface.fill(WHITE)
@@ -446,7 +400,6 @@ class Boss:
                 proj_x = int(projectile['x'] - camera_x)
                 proj_y = int(projectile['y'] - camera_y)
                 
-                # Boss projectiles are larger and more colorful
                 if self.boss_type == BossType.NECROMANCER:
                     pygame.draw.circle(surface, PURPLE, (proj_x, proj_y), 8)
                     pygame.draw.circle(surface, WHITE, (proj_x, proj_y), 4)

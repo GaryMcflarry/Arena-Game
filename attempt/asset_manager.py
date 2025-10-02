@@ -9,15 +9,12 @@ class AssetManager:
         self.sounds = {}
         self.fonts = {}
         
-        # Asset paths
         self.texture_path = "assets/textures/"
         self.sound_path = "assets/sounds/"
         self.font_path = "assets/fonts/"
         
-        # Create directories if they don't exist
         self.create_directories()
         
-        # Load default assets
         self.load_default_assets()
         
     def create_directories(self):
@@ -52,7 +49,6 @@ class AssetManager:
             
         full_path = os.path.join(self.texture_path, filename)
         
-        # Check if file exists first
         if not os.path.exists(full_path):
             print(f"Texture file not found: {filename} (will use placeholder)")
             placeholder = self.create_placeholder_texture()
@@ -75,7 +71,6 @@ class AssetManager:
         surface = pygame.Surface(size)
         surface.fill(color)
         
-        # Add a simple pattern so it's obvious it's a placeholder
         pygame.draw.rect(surface, (200, 200, 200), (0, 0, size[0]//2, size[1]//2))
         pygame.draw.rect(surface, (200, 200, 200), (size[0]//2, size[1]//2, size[0]//2, size[1]//2))
         
@@ -83,9 +78,7 @@ class AssetManager:
     
     def load_default_assets(self):
         """Load default textures with fallbacks"""
-        # Town textures
         default_textures = {
-            # Town building walls
             "town_wall": "town/stone_wall.png",
             "house_wall": "town/wood_wall.png", 
             "weapon_shop": "town/forge_wall.png",
@@ -93,27 +86,22 @@ class AssetManager:
             "healer_wall": "town/temple_wall.png",
             "arena_entrance": "town/arena_wall.png",
             
-            # Town floors
             "cobblestone": "town/cobblestone.png",
             "dirt_path": "town/dirt.png",
             
-            # Arena textures
             "arena_wall": "arena/stone_wall.png",
             "arena_pillar": "arena/pillar.png",
             "arena_floor": "arena/stone_floor.png",
             
-            # UI elements
             "crosshair": "ui/crosshair.png",
             "health_bar": "ui/health_bar.png",
         }
         
-        # Try to load each texture, but don't crash if missing
         for key, filename in default_textures.items():
             try:
                 self.load_texture(filename, key)
             except Exception as e:
                 print(f"Could not load {filename}, will use placeholder: {e}")
-                # Create and store a placeholder
                 self.textures[key] = self.create_placeholder_texture()
     
     def get_texture(self, key):
@@ -162,5 +150,4 @@ class AssetManager:
         for texture_key in common_textures:
             self.get_texture(texture_key)
 
-# Global asset manager instance
 asset_manager = AssetManager()

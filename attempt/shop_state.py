@@ -9,7 +9,6 @@ class ShopState:
         self.game_manager = game_manager
         self.player = player
         
-        # ADD THIS: Sound manager reference
         self.sound_manager = None
         
         self.shop_type = None
@@ -20,9 +19,7 @@ class ShopState:
         self.title_font = pygame.font.Font(None, 48)
         self.info_font = pygame.font.Font(None, 24)
         
-        # Shop inventory
         self.weapon_items = [
-            # Removed sword upgrades - only armor now
         ]
         
         self.magic_items = [
@@ -32,7 +29,6 @@ class ShopState:
             {"name": "Master Robes", "level": 5, "cost": 2000, "description": "Ultimate magical power"},
         ]
         
-        # Only damage spells - removed shield and teleport
         self.spell_items = [
             {"name": "Lightning Bolt", "spell": "lightning", "cost": 200, "description": "Fast, low-cost electric attack"},
             {"name": "Ice Shard", "spell": "ice", "cost": 300, "description": "Powerful ice projectile"},
@@ -61,31 +57,24 @@ class ShopState:
         self.selected_item = 0
         
         if shop_type == ShopType.WEAPON:
-            # Show only armor upgrades (no more sword upgrades)
             self.items = []
-            # Add available armor upgrades  
             for item in self.armor_items:
                 if item["level"] == self.player.armor_level + 1:
                     self.items.append(item)
                     
         elif shop_type == ShopType.MAGIC:
-            # Show magic upgrades and spells
             self.items = []
-            # Add available magic level upgrades
             for item in self.magic_items:
                 if item["level"] == self.player.spell_level + 1:
                     self.items.append(item)
             
-            # Add spells the player doesn't know yet
             for spell_item in self.spell_items:
                 if spell_item["spell"] not in self.player.known_spells:
                     self.items.append(spell_item)
                     
         elif shop_type == ShopType.HEALER:
-            # Show all healing items
             self.items = self.healing_items.copy()
             
-        # Add exit option
         self.items.append({"name": "Leave Shop", "cost": 0, "description": "Return to town"})
         
     def handle_event(self, event):
@@ -104,57 +93,44 @@ class ShopState:
             
         item = self.items[self.selected_item]
         
-        # Check for exit option
         if item["name"] == "Leave Shop":
             self.game_manager.change_state(GameState.TOWN)
             return
             
-        # Check if player can afford the item
         if not self.player.spend_gold(item["cost"]):
-            return  # Not enough gold
+            return  
             
-        # PLAY SHOP BUY SOUND - ADD THIS!
         if self.sound_manager:
             self.sound_manager.play_sound('shop_buy')
         
-        # Apply item effects
         if "level" in item:
-            # Upgrade item
             if "Sword" in item["name"]:
                 self.player.weapon_level = item["level"]
             elif "Robes" in item["name"]:
                 self.player.spell_level = item["level"]
-                # Update max mana when spell level changes
                 self.player.mana = self.player.get_max_mana()
             elif "Armor" in item["name"]:
                 self.player.armor_level = item["level"]
-                # Update max health when armor changes
                 self.player.health = self.player.get_max_health()
                 
         elif "spell" in item:
-            # Learn new spell
             self.player.learn_spell(item["spell"])
             
         elif "heal" in item:
-            # Healing item
             self.player.heal(item["heal"])
             
         elif "mana" in item:
-            # Mana item
             self.player.restore_mana(item["mana"])
             
-        # If it was a healing item, don't remove from shop
         if self.shop_type != ShopType.HEALER:
-            # Update shop items after purchase
             self.set_shop_type(self.shop_type)
             
     def update(self, dt):
-        pass  # No updates needed for shop
+        pass 
         
     def render(self):
         self.screen.fill(BLACK)
         
-        # Draw shop title
         shop_names = {
             ShopType.WEAPON: "Blacksmith - Weapons & Armor",
             ShopType.MAGIC: "Mystic Arts - Magical Equipment & Spells", 
@@ -165,11 +141,9 @@ class ShopState:
         title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, 50))
         self.screen.blit(title_text, title_rect)
         
-        # Draw player gold
         gold_text = self.font.render(f"Gold: {self.player.gold}", True, YELLOW)
         self.screen.blit(gold_text, (50, 100))
         
-        # Draw player stats
         stats_y = 130
         stats = []
         if self.shop_type == ShopType.WEAPON:
@@ -194,13 +168,11 @@ class ShopState:
             stat_text = self.info_font.render(stat, True, WHITE)
             self.screen.blit(stat_text, (50, stats_y + i * 25))
         
-        # Show known spells for magic shop
         if self.shop_type == ShopType.MAGIC:
             spells_text = "Known: " + ", ".join([s.title() for s in self.player.known_spells])
             spells_surface = self.info_font.render(spells_text, True, LIGHT_BLUE)
             self.screen.blit(spells_surface, (50, stats_y + len(stats) * 25))
         
-        # Draw shop items
         if not self.items:
             no_items_text = self.font.render("No items available", True, GRAY)
             no_items_rect = no_items_text.get_rect(center=(SCREEN_WIDTH // 2, 300))
@@ -210,14 +182,12 @@ class ShopState:
             for i, item in enumerate(self.items):
                 color = YELLOW if i == self.selected_item else WHITE
                 
-                # Check if player can afford item
                 if item["cost"] > self.player.gold and item["name"] != "Leave Shop":
                     color = GRAY
                 
-                # Special color for spells
                 if "spell" in item:
                     if i == self.selected_item:
-                        color = (255, 100, 255)  # Bright magenta
+                        color = (255, 100, 255) 
                     else:
                         color = PURPLE
                 
@@ -228,11 +198,9 @@ class ShopState:
                 text_surface = self.font.render(item_text, True, color)
                 self.screen.blit(text_surface, (100, start_y + i * 40))
                 
-                # Draw description
                 desc_text = self.info_font.render(item["description"], True, GRAY)
                 self.screen.blit(desc_text, (120, start_y + i * 40 + 25))
                 
-        # Draw controls
         controls = [
             "UP/DOWN: Navigate",
             "ENTER/SPACE: Purchase",
@@ -243,7 +211,6 @@ class ShopState:
             control_text = self.info_font.render(control, True, GRAY)
             self.screen.blit(control_text, (50, controls_y + i * 20))
             
-        # Draw upgrade benefits
         if self.items and self.selected_item < len(self.items):
             item = self.items[self.selected_item]
             if ("level" in item or "spell" in item) and item["name"] != "Leave Shop":
@@ -275,13 +242,11 @@ class ShopState:
                         new_hp = 100 + (item["level"] - 1) * 20
                         benefits.append(f"Max Health: {current_hp} → {new_hp}")
                 elif "spell" in item:
-                    # Show spell information
                     spell_name = item["spell"]
                     mana_cost = self.player.spell_costs.get(spell_name, 0)
                     benefits.append(f"Spell: {spell_name.title()}")
                     benefits.append(f"Mana Cost: {mana_cost}")
                     
-                    # Spell descriptions
                     spell_effects = {
                         "lightning": "Fast, low-cost attack",
                         "ice": "High damage ice projectile", 
