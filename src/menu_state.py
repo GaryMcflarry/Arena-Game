@@ -44,8 +44,8 @@ class MenuState:
         title_text = self.title_font.render("ARENA OF SHADOWS", True, GOLD)
         title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, 150))
         self.screen.blit(title_text, title_rect)
-        
-        subtitle_text = self.info_font.render("An Elder Scrolls Inspired Adventure", True, SILVER)
+
+        subtitle_text = self.info_font.render("An Journey of Glory and Revenge", True, SILVER)
         subtitle_rect = subtitle_text.get_rect(center=(SCREEN_WIDTH // 2, 190))
         self.screen.blit(subtitle_text, subtitle_rect)
         

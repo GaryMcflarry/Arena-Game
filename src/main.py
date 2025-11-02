@@ -6,7 +6,7 @@ from constants import FPS, SCREEN_HEIGHT, SCREEN_WIDTH
 def main():
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption("Elder Scrolls: Arena of Shadows")
+    pygame.display.set_caption("Arena of Shadows")
     clock = pygame.time.Clock()
     
     game_manager = GameStateManager(screen)

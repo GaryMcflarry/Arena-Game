@@ -226,21 +226,21 @@ class ShopState:
                     if "Sword" in item["name"]:
                         current_dmg = self.player.get_weapon_damage()
                         new_dmg = 30 + (item["level"] - 1) * 15
-                        benefits.append(f"Damage: {current_dmg} → {new_dmg}")
+                        benefits.append(f"Damage: {current_dmg} + {new_dmg}")
                     elif "Robes" in item["name"]:
                         current_mult = self.player.get_spell_damage_multiplier()
                         new_mult = 1.0 + (item["level"] - 1) * 0.25
-                        benefits.append(f"Spell Power: x{current_mult:.2f} → x{new_mult:.2f}")
+                        benefits.append(f"Spell Power: x{current_mult:.2f} + x{new_mult:.2f}")
                         current_mana = self.player.get_max_mana()
                         new_mana = 100 + (item["level"] - 1) * 15
-                        benefits.append(f"Max Mana: {current_mana} → {new_mana}")
+                        benefits.append(f"Max Mana: {current_mana} + {new_mana}")
                     elif "Armor" in item["name"]:
                         current_def = self.player.get_armor_defense()
                         new_def = (item["level"] - 1) * 0.1
-                        benefits.append(f"Damage Reduction: {current_def:.0%} → {new_def:.0%}")
+                        benefits.append(f"Damage Reduction: {current_def:.0%} + {new_def:.0%}")
                         current_hp = self.player.get_max_health()
                         new_hp = 100 + (item["level"] - 1) * 20
-                        benefits.append(f"Max Health: {current_hp} → {new_hp}")
+                        benefits.append(f"Max Health: {current_hp} + {new_hp}")
                 elif "spell" in item:
                     spell_name = item["spell"]
                     mana_cost = self.player.spell_costs.get(spell_name, 0)
