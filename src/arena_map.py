@@ -9,16 +9,18 @@ class ArenaMap:
         
     def create_arena_map(self):
         """Create the smaller circular arena without pillars"""
+        # Start with all walls
         arena_map = [[1 for _ in range(self.width)] for _ in range(self.height)]
         
         center_x, center_y = self.width // 2, self.height // 2
         arena_radius = 6  
         
+        # Carve out circular arena in the center
         for y in range(self.height):
             for x in range(self.width):
                 distance = math.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
                 if distance < arena_radius:
-                    arena_map[y][x] = 0
+                    arena_map[y][x] = 0  # Walkable floor
         
         return arena_map
         
@@ -26,7 +28,7 @@ class ArenaMap:
         """Get tile type at given coordinates"""
         if 0 <= x < self.width and 0 <= y < self.height:
             return self.collision_map[y][x]
-        return 1 
+        return 1  # Return wall if out of bounds
         
     def is_walkable(self, x, y):
         """Check if a tile is walkable"""

@@ -1,6 +1,6 @@
-# Elder Scrolls: Arena of Shadows
+# Shadow Arena
 
-A 3D first-person dungeon crawler inspired by Elder Scrolls Arena, built with Python and Pygame.
+A 3D first-person dungeon crawlerb built with Python and Pygame.
 
 ## Game Structure
 
@@ -35,11 +35,7 @@ A 3D first-person dungeon crawler inspired by Elder Scrolls Arena, built with Py
 - **Mouse** - Look around
 - **Left Click** - Cast spell (arena only)
 - **Right Click** - Cycle spells (arena only)
-- **SPACE** - Jump
-- **SHIFT** - Sprint
 - **E** - Interact with buildings (town only)
-- **M** - Toggle minimap
-- **1/2/3** - Select specific spell (arena only)
 - **ESC** - Return to main menu
 
 ### Menus & Shops
@@ -60,7 +56,6 @@ A 3D first-person dungeon crawler inspired by Elder Scrolls Arena, built with Py
 - 4 enemy types with different strengths
 - 4 unique bosses with special abilities
 - 3 spell types (Fireball, Lightning, Ice)
-- Jump mechanics for dodging
 - Real-time 3D combat
 
 ### Progression System
@@ -81,35 +76,3 @@ A 3D first-person dungeon crawler inspired by Elder Scrolls Arena, built with Py
 1. Ensure Python 3.7+ is installed
 2. Install Pygame: `pip install pygame`
 3. Run the game: `python main.py`
-
-## Technical Features
-
-- Custom 3D raycasting engine
-- Mouse-captured FPS controls
-- Modular game state system
-- Real-time collision detection
-- Dynamic enemy AI
-- Particle/spell projectile system
-
-## Assignment Compliance
-
-This game meets all requirements:
-- ✅ Complete game design document planning
-- ✅ Python/Pygame implementation 
-- ✅ Runnable base implementation (Stage 2)
-- ✅ Complete game with all features (Stage 3)
-- ✅ Appropriate scope for solo development
-- ✅ Business viability for indie game company
-- ✅ Borrows ideas from existing games (Elder Scrolls Arena)
-- ✅ Multiple interconnected systems
-- ✅ Professional code structure
-
-## Future Enhancements
-
-- Sound effects and background music
-- Animated sprites and textures
-- More enemy types and boss mechanics
-- Save/load game progress
-- Additional spells and weapons
-- Larger town with more buildings
-- Multiple arena types

@@ -37,20 +37,20 @@ class AssetManager:
         for directory in directories:
             if not os.path.exists(directory):
                 os.makedirs(directory)
-                print(f"Created directory: {directory}")
     
     def load_texture(self, filename, key=None):
         """Load a texture and cache it"""
         if key is None:
             key = filename
             
+        # Return cached texture if already loaded
         if key in self.textures:
             return self.textures[key]
             
         full_path = os.path.join(self.texture_path, filename)
         
+        # Use placeholder if file doesn't exist
         if not os.path.exists(full_path):
-            print(f"Texture file not found: {filename} (will use placeholder)")
             placeholder = self.create_placeholder_texture()
             self.textures[key] = placeholder
             return placeholder
@@ -58,10 +58,8 @@ class AssetManager:
         try:
             texture = pygame.image.load(full_path).convert_alpha()
             self.textures[key] = texture
-            print(f"Loaded texture: {filename}")
             return texture
         except pygame.error as e:
-            print(f"Could not load texture {filename}: {e}")
             placeholder = self.create_placeholder_texture()
             self.textures[key] = placeholder
             return placeholder
@@ -71,6 +69,7 @@ class AssetManager:
         surface = pygame.Surface(size)
         surface.fill(color)
         
+        # Create checkerboard pattern
         pygame.draw.rect(surface, (200, 200, 200), (0, 0, size[0]//2, size[1]//2))
         pygame.draw.rect(surface, (200, 200, 200), (size[0]//2, size[1]//2, size[0]//2, size[1]//2))
         
@@ -79,6 +78,7 @@ class AssetManager:
     def load_default_assets(self):
         """Load default textures with fallbacks"""
         default_textures = {
+            # Town textures
             "town_wall": "town/stone_wall.png",
             "house_wall": "town/wood_wall.png", 
             "weapon_shop": "town/forge_wall.png",
@@ -86,13 +86,16 @@ class AssetManager:
             "healer_wall": "town/temple_wall.png",
             "arena_entrance": "town/arena_wall.png",
             
+            # Floor textures
             "cobblestone": "town/cobblestone.png",
             "dirt_path": "town/dirt.png",
             
+            # Arena textures
             "arena_wall": "arena/stone_wall.png",
             "arena_pillar": "arena/pillar.png",
             "arena_floor": "arena/stone_floor.png",
             
+            # UI textures
             "crosshair": "ui/crosshair.png",
             "health_bar": "ui/health_bar.png",
         }
@@ -101,7 +104,6 @@ class AssetManager:
             try:
                 self.load_texture(filename, key)
             except Exception as e:
-                print(f"Could not load {filename}, will use placeholder: {e}")
                 self.textures[key] = self.create_placeholder_texture()
     
     def get_texture(self, key):
@@ -109,7 +111,6 @@ class AssetManager:
         if key in self.textures:
             return self.textures[key]
         else:
-            print(f"Texture '{key}' not found, using placeholder")
             return self.create_placeholder_texture()
     
     def get_scaled_texture(self, key, width, height):
@@ -122,6 +123,7 @@ class AssetManager:
         if key is None:
             key = filename
             
+        # Return cached sound if already loaded
         if key in self.sounds:
             return self.sounds[key]
             
@@ -130,10 +132,8 @@ class AssetManager:
         try:
             sound = pygame.mixer.Sound(full_path)
             self.sounds[key] = sound
-            print(f"Loaded sound: {filename}")
             return sound
         except pygame.error as e:
-            print(f"Could not load sound {filename}: {e}")
             return None
     
     def get_sound(self, key):
@@ -150,4 +150,5 @@ class AssetManager:
         for texture_key in common_textures:
             self.get_texture(texture_key)
 
+# Global asset manager instance
 asset_manager = AssetManager()

@@ -15,10 +15,12 @@ class ShopState:
         self.selected_item = 0
         self.items = []
         
+        # Fonts
         self.font = pygame.font.Font(None, 32)
         self.title_font = pygame.font.Font(None, 48)
         self.info_font = pygame.font.Font(None, 24)
         
+        # Shop inventory definitions
         self.weapon_items = [
         ]
         
@@ -56,18 +58,22 @@ class ShopState:
         self.shop_type = shop_type
         self.selected_item = 0
         
+        # Build available items based on shop type
         if shop_type == ShopType.WEAPON:
             self.items = []
+            # Show next armor upgrade if available
             for item in self.armor_items:
                 if item["level"] == self.player.armor_level + 1:
                     self.items.append(item)
                     
         elif shop_type == ShopType.MAGIC:
             self.items = []
+            # Show next magic upgrade if available
             for item in self.magic_items:
                 if item["level"] == self.player.spell_level + 1:
                     self.items.append(item)
             
+            # Show unknown spells
             for spell_item in self.spell_items:
                 if spell_item["spell"] not in self.player.known_spells:
                     self.items.append(spell_item)
@@ -75,6 +81,7 @@ class ShopState:
         elif shop_type == ShopType.HEALER:
             self.items = self.healing_items.copy()
             
+        # Always add exit option
         self.items.append({"name": "Leave Shop", "cost": 0, "description": "Return to town"})
         
     def handle_event(self, event):
@@ -93,16 +100,19 @@ class ShopState:
             
         item = self.items[self.selected_item]
         
+        # Handle shop exit
         if item["name"] == "Leave Shop":
             self.game_manager.change_state(GameState.TOWN)
             return
             
+        # Check if player can afford item
         if not self.player.spend_gold(item["cost"]):
-            return  
+            return
             
         if self.sound_manager:
             self.sound_manager.play_sound('shop_buy')
         
+        # Apply item effects
         if "level" in item:
             if "Sword" in item["name"]:
                 self.player.weapon_level = item["level"]
@@ -122,15 +132,17 @@ class ShopState:
         elif "mana" in item:
             self.player.restore_mana(item["mana"])
             
+        # Refresh shop inventory for non-consumable shops
         if self.shop_type != ShopType.HEALER:
             self.set_shop_type(self.shop_type)
             
     def update(self, dt):
-        pass 
+        pass
         
     def render(self):
         self.screen.fill(BLACK)
         
+        # Shop title
         shop_names = {
             ShopType.WEAPON: "Blacksmith - Weapons & Armor",
             ShopType.MAGIC: "Mystic Arts - Magical Equipment & Spells", 
@@ -141,9 +153,11 @@ class ShopState:
         title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, 50))
         self.screen.blit(title_text, title_rect)
         
+        # Display player gold
         gold_text = self.font.render(f"Gold: {self.player.gold}", True, YELLOW)
         self.screen.blit(gold_text, (50, 100))
         
+        # Display relevant player stats
         stats_y = 130
         stats = []
         if self.shop_type == ShopType.WEAPON:
@@ -168,11 +182,13 @@ class ShopState:
             stat_text = self.info_font.render(stat, True, WHITE)
             self.screen.blit(stat_text, (50, stats_y + i * 25))
         
+        # Show known spells for magic shop
         if self.shop_type == ShopType.MAGIC:
             spells_text = "Known: " + ", ".join([s.title() for s in self.player.known_spells])
             spells_surface = self.info_font.render(spells_text, True, LIGHT_BLUE)
             self.screen.blit(spells_surface, (50, stats_y + len(stats) * 25))
         
+        # Display shop items
         if not self.items:
             no_items_text = self.font.render("No items available", True, GRAY)
             no_items_rect = no_items_text.get_rect(center=(SCREEN_WIDTH // 2, 300))
@@ -182,15 +198,18 @@ class ShopState:
             for i, item in enumerate(self.items):
                 color = YELLOW if i == self.selected_item else WHITE
                 
+                # Gray out items player can't afford
                 if item["cost"] > self.player.gold and item["name"] != "Leave Shop":
                     color = GRAY
                 
+                # Special color for spells
                 if "spell" in item:
                     if i == self.selected_item:
-                        color = (255, 100, 255) 
+                        color = (255, 100, 255)
                     else:
                         color = PURPLE
                 
+                # Item name and cost
                 item_text = f"{item['name']} - {item['cost']} gold"
                 if item["name"] == "Leave Shop":
                     item_text = item["name"]
@@ -198,9 +217,11 @@ class ShopState:
                 text_surface = self.font.render(item_text, True, color)
                 self.screen.blit(text_surface, (100, start_y + i * 40))
                 
+                # Item description
                 desc_text = self.info_font.render(item["description"], True, GRAY)
                 self.screen.blit(desc_text, (120, start_y + i * 40 + 25))
                 
+        # Controls
         controls = [
             "UP/DOWN: Navigate",
             "ENTER/SPACE: Purchase",
@@ -211,6 +232,7 @@ class ShopState:
             control_text = self.info_font.render(control, True, GRAY)
             self.screen.blit(control_text, (50, controls_y + i * 20))
             
+        # Show detailed item benefits for selected item
         if self.items and self.selected_item < len(self.items):
             item = self.items[self.selected_item]
             if ("level" in item or "spell" in item) and item["name"] != "Leave Shop":
@@ -247,6 +269,7 @@ class ShopState:
                     benefits.append(f"Spell: {spell_name.title()}")
                     benefits.append(f"Mana Cost: {mana_cost}")
                     
+                    # Spell descriptions
                     spell_effects = {
                         "lightning": "Fast, low-cost attack",
                         "ice": "High damage ice projectile", 
@@ -257,6 +280,7 @@ class ShopState:
                     effect = spell_effects.get(spell_name, "Unknown effect")
                     benefits.append(f"Effect: {effect}")
                 
+                # Display benefits list
                 for j, benefit in enumerate(benefits):
                     benefit_surface = self.info_font.render(benefit, True, WHITE)
                     self.screen.blit(benefit_surface, (benefits_x, benefits_y + 30 + j * 20))

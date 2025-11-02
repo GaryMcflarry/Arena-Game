@@ -7,6 +7,7 @@ class MenuState:
         self.screen = screen
         self.game_manager = game_manager
         
+        # Menu options with their corresponding actions
         self.menu_options = [
             ("Enter Town", GameState.TOWN),
             ("Enter Arena", GameState.ARENA),
@@ -14,6 +15,8 @@ class MenuState:
         ]
         
         self.selected_option = 0
+        
+        # Fonts
         self.font = pygame.font.Font(None, 48)
         self.title_font = pygame.font.Font(None, 72)
         self.info_font = pygame.font.Font(None, 24)
@@ -28,6 +31,7 @@ class MenuState:
                 self.select_option()
                 
     def select_option(self):
+        """Execute the selected menu option"""
         option_text, option_action = self.menu_options[self.selected_option]
         
         if option_action == "quit":
@@ -36,19 +40,22 @@ class MenuState:
             self.game_manager.change_state(option_action)
             
     def update(self, dt):
-        pass 
+        pass
         
     def render(self):
         self.screen.fill(BLACK)
         
+        # Title
         title_text = self.title_font.render("ARENA OF SHADOWS", True, GOLD)
         title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, 150))
         self.screen.blit(title_text, title_rect)
 
+        # Subtitle
         subtitle_text = self.info_font.render("An Journey of Glory and Revenge", True, SILVER)
         subtitle_rect = subtitle_text.get_rect(center=(SCREEN_WIDTH // 2, 190))
         self.screen.blit(subtitle_text, subtitle_rect)
         
+        # Menu options
         start_y = 280
         for i, (option_text, _) in enumerate(self.menu_options):
             color = YELLOW if i == self.selected_option else WHITE
@@ -56,6 +63,7 @@ class MenuState:
             option_rect = option_surface.get_rect(center=(SCREEN_WIDTH // 2, start_y + i * 60))
             self.screen.blit(option_surface, option_rect)
             
+        # Player stats
         player = self.game_manager.player
         stats_y = 450
         stats = [
@@ -70,6 +78,7 @@ class MenuState:
             stat_text = self.info_font.render(stat, True, WHITE)
             self.screen.blit(stat_text, (50, stats_y + i * 25))
             
+        # Controls info
         controls = [
             "UP/DOWN: Navigate Menu",
             "ENTER/SPACE: Select",

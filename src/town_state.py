@@ -20,15 +20,16 @@ class NPC:
         self.has_talked = False
         self.is_being_talked_to = False
         
+        # Wandering behavior
         self.target_x = x
         self.target_y = y
-        self.wander_radius = 60 
+        self.wander_radius = 60
         self.home_x = x
         self.home_y = y
         self.target_reached_time = 0
         self.wait_time = 3000
         self.stuck_timer = 0
-        self.max_stuck_time = 2000  
+        self.max_stuck_time = 2000
         
     def update(self, dt, current_time, town_map):
         """Update NPC movement with collision detection"""
@@ -37,7 +38,8 @@ class NPC:
             
         distance_to_target = math.sqrt((self.x - self.target_x)**2 + (self.y - self.target_y)**2)
         
-        if distance_to_target < 15: 
+        # Check if target reached
+        if distance_to_target < 15:
             if current_time - self.target_reached_time > self.wait_time:
                 self.set_new_target(town_map)
                 self.target_reached_time = current_time
@@ -45,6 +47,7 @@ class NPC:
         else:
             old_x, old_y = self.x, self.y
             
+            # Move towards target
             dx = self.target_x - self.x
             dy = self.target_y - self.y
             if distance_to_target > 0:
@@ -57,13 +60,15 @@ class NPC:
                 new_tile_x = int(new_x // TILE_SIZE)
                 new_tile_y = int(new_y // TILE_SIZE)
                 
+                # Check collision before moving
                 if town_map.is_walkable(new_tile_x, new_tile_y):
                     self.x = new_x
                     self.y = new_y
                     self.stuck_timer = 0
                 else:
-                    self.stuck_timer += dt * 1000 
+                    self.stuck_timer += dt * 1000
                     
+                    # Find new target if stuck too long
                     if self.stuck_timer > self.max_stuck_time:
                         self.set_new_target(town_map)
                         self.stuck_timer = 0
@@ -81,12 +86,14 @@ class NPC:
             potential_x = self.home_x + math.cos(angle) * distance
             potential_y = self.home_y + math.sin(angle) * distance
             
+            # Keep within map bounds
             potential_x = max(TILE_SIZE, min((town_map.width - 1) * TILE_SIZE, potential_x))
             potential_y = max(TILE_SIZE, min((town_map.height - 1) * TILE_SIZE, potential_y))
             
             target_tile_x = int(potential_x // TILE_SIZE)
             target_tile_y = int(potential_y // TILE_SIZE)
             
+            # Check if target is walkable
             if town_map.is_walkable(target_tile_x, target_tile_y):
                 self.target_x = potential_x
                 self.target_y = potential_y
@@ -94,6 +101,7 @@ class NPC:
                 
             attempts += 1
         
+        # Fallback to home position
         self.target_x = self.home_x
         self.target_y = self.home_y
 
@@ -106,11 +114,13 @@ class TownState:
         self.town_map = TownMap()
         self.raycaster = RayCaster(screen)
         
+        # Interaction system
         self.interaction_range = 80
         self.show_interaction_prompt = False
         self.current_interaction = None
         self.current_npc = None
         
+        # Dialogue system
         self.show_dialogue = False
         self.dialogue_text = ""
         self.dialogue_timer = 0
@@ -119,6 +129,7 @@ class TownState:
         self.dialogue_choices = []
         self.selected_choice = 0
         
+        # Create NPCs with dialogue
         self.npcs = [
             NPC(3 * TILE_SIZE + 20, 2 * TILE_SIZE + 30, "Gareth the Merchant", GREEN, [
                 "Ah, a fellow trader! I deal in only the finest goods.",
@@ -192,10 +203,12 @@ class TownState:
             if npc.texture_key and npc.texture_key in self.raycaster.textures:
                 npc.image = self.raycaster.textures[npc.texture_key]
             else:
+                # Create fallback sprite
                 fallback_size = 32
                 npc.image = pygame.Surface((fallback_size, fallback_size))
                 npc.image.fill(npc.color)
                 
+                # Add simple eyes
                 eye_size = fallback_size // 8
                 left_eye_x = fallback_size // 4
                 right_eye_x = fallback_size * 3 // 4
@@ -206,10 +219,12 @@ class TownState:
         
     def initialize_town(self):
         """Initialize/reset town state"""
-        self.player.x = 7 * TILE_SIZE + TILE_SIZE // 2  
-        self.player.y = 10 * TILE_SIZE + TILE_SIZE // 2  
-        self.player.angle = -math.pi / 2  
+        # Place player at town entrance
+        self.player.x = 7 * TILE_SIZE + TILE_SIZE // 2
+        self.player.y = 10 * TILE_SIZE + TILE_SIZE // 2
+        self.player.angle = -math.pi / 2
         
+        # Reset dialogue state
         self.show_dialogue = False
         self.show_dialogue_choices = False
         self.dialogue_text = ""
@@ -243,6 +258,7 @@ class TownState:
             self.dialogue_timer = pygame.time.get_ticks()
             self.current_npc.is_being_talked_to = True
             
+            # Generate dialogue choices based on NPC
             npc_name = self.current_npc.name.lower()
             if "merchant" in npc_name or "gareth" in npc_name:
                 self.dialogue_choices = [
@@ -318,6 +334,7 @@ class TownState:
         """Get NPC response based on dialogue choice"""
         npc_name = npc.name.lower()
         
+        # NPC-specific responses
         if "gareth" in npc_name:
             responses = [
                 "I have silk, spices, and fine jewelry from distant lands!",
@@ -395,7 +412,6 @@ class TownState:
                 from constants import GameState
                 self.game_manager.change_state(GameState.ARENA)
         except Exception as e:
-            print(f"Error changing state: {e}")
             self.dialogue_text = f"The {self.current_interaction.replace('_', ' ')} is currently closed."
             self.show_dialogue = True
             self.dialogue_timer = pygame.time.get_ticks()
@@ -405,12 +421,14 @@ class TownState:
         self.show_interaction_prompt = False
         self.current_interaction = None
         
+        # Reset NPC interaction states
         for npc in self.npcs:
             if not npc.is_being_talked_to:
                 npc.is_being_talked_to = False
         
         self.current_npc = None
         
+        # Check for nearby NPCs
         for npc in self.npcs:
             distance = math.sqrt(
                 (self.player.x - npc.x) ** 2 + 
@@ -423,6 +441,7 @@ class TownState:
                 npc.is_being_talked_to = True
                 return
         
+        # Check for nearby buildings
         player_map_x = int(self.player.x // TILE_SIZE)
         player_map_y = int(self.player.y // TILE_SIZE)
         
@@ -461,6 +480,7 @@ class TownState:
     def update(self, dt):
         current_time = pygame.time.get_ticks()
         
+        # Player movement with collision
         keys = pygame.key.get_pressed()
         old_x, old_y = self.player.x, self.player.y
         
@@ -470,6 +490,7 @@ class TownState:
         player_tile_x = int(self.player.x // TILE_SIZE)
         player_tile_y = int(self.player.y // TILE_SIZE)
         
+        # Check bounds and walkability
         if (player_tile_x < 0 or player_tile_x >= self.town_map.width or
             player_tile_y < 0 or player_tile_y >= self.town_map.height or
             not self.town_map.is_walkable(player_tile_x, player_tile_y)):
@@ -477,28 +498,30 @@ class TownState:
         
         self.player.update(dt)
         
+        # Update NPCs
         for npc in self.npcs:
             npc.update(dt, current_time, self.town_map)
         
         self.check_interactions()
         
+        # Handle dialogue timeouts
         if self.show_dialogue:
             if current_time - self.dialogue_timer > self.dialogue_duration:
                 self.end_dialogue()
         
         if self.show_dialogue_choices:
-            if current_time - self.dialogue_timer > 15000: 
+            if current_time - self.dialogue_timer > 15000:
                 self.end_dialogue()
         
     def render(self):
         self.screen.fill(BLACK)
         
+        # Render 3D town view
         rays = self.raycaster.cast_rays(self.player, self.town_map.collision_map,
                                        self.town_map.width, self.town_map.height)
         self.raycaster.render_3d_town(rays, self.player)
         
         self.render_npcs(rays)
-        
         self.draw_ui()
         
     def render_npcs(self, rays):
@@ -516,14 +539,17 @@ class TownState:
             npc_angle = math.atan2(dy, dx)
             angle_diff = npc_angle - self.player.angle
             
+            # Normalize angle
             while angle_diff > math.pi:
                 angle_diff -= 2 * math.pi
             while angle_diff < -math.pi:
                 angle_diff += 2 * math.pi
                 
+            # Only render if in field of view
             if abs(angle_diff) < HALF_FOV:
+                # Check if NPC is blocked by walls
                 npc_blocked = False
-                steps = int(npc_distance / 10)  
+                steps = int(npc_distance / 10)
                 
                 for step in range(1, steps):
                     check_x = self.player.x + (dx * step / steps)
@@ -535,9 +561,10 @@ class TownState:
                         npc_blocked = True
                         break
                 
-                if not npc_blocked:  
+                if not npc_blocked:
                     screen_x = (angle_diff / HALF_FOV) * (SCREEN_WIDTH // 2) + (SCREEN_WIDTH // 2)
                     
+                    # Scale NPC based on distance
                     npc_scale = max(8, int(npc.size * 600 / (npc_distance + 0.1)))
                     npc_width = npc_scale
                     npc_height = npc_scale * 1.5
@@ -547,6 +574,7 @@ class TownState:
                     if npc.image:
                         scaled_npc = pygame.transform.scale(npc.image, (int(npc_width), int(npc_height)))
                         
+                        # Apply distance-based darkness
                         if npc_distance > 100:
                             dark_surface = pygame.Surface((int(npc_width), int(npc_height)))
                             dark_surface.fill((0, 0, 0))
@@ -560,6 +588,7 @@ class TownState:
                             npc_rect = (screen_x - npc_width // 2, npc_y, npc_width, npc_height)
                             self.screen.blit(scaled_npc, npc_rect)
                     else:
+                        # Fallback colored sprite
                         npc_rect = (
                             screen_x - npc_width // 2,
                             npc_y,
@@ -568,6 +597,7 @@ class TownState:
                         )
                         pygame.draw.rect(self.screen, npc.color, npc_rect)
                         
+                        # Add eyes if sprite is large enough
                         if npc_scale > 10:
                             eye_size = max(1, int(npc_scale // 8))
                             left_eye_x = int(screen_x - npc_width // 4)
@@ -577,6 +607,7 @@ class TownState:
                             pygame.draw.circle(self.screen, WHITE, (left_eye_x, eye_y), eye_size)
                             pygame.draw.circle(self.screen, WHITE, (right_eye_x, eye_y), eye_size)
                     
+                    # Show NPC name when close
                     if npc_distance < 120 and npc_scale > 15:
                         name_font = pygame.font.Font(None, max(12, int(npc_scale // 3)))
                         name_text = name_font.render(npc.name, True, WHITE)
@@ -589,6 +620,8 @@ class TownState:
                         self.screen.blit(name_text, name_rect)
         
     def draw_ui(self):
+        """Draw town UI elements"""
+        # Player stats
         stats_y = 10
         stats = [
             f"Gold: {self.player.gold}",
@@ -600,6 +633,7 @@ class TownState:
             stat_text = self.font.render(stat, True, WHITE)
             self.screen.blit(stat_text, (10, stats_y + i * 25))
             
+        # Interaction prompt
         if self.show_interaction_prompt and not self.show_dialogue_choices:
             if self.current_npc:
                 prompt_text = f"Press E to talk to {self.current_npc.name.split()[0]}"
@@ -623,6 +657,7 @@ class TownState:
             
             self.screen.blit(text_surface, text_rect)
         
+        # Dialogue system
         if self.show_dialogue_choices:
             self.draw_dialogue_choices()
             
@@ -636,8 +671,8 @@ class TownState:
             lines = self.dialogue_text.split('\n')
             line_height = 18
             
-            for i, line in enumerate(lines[:5]):  
-                if line.strip():  
+            for i, line in enumerate(lines[:5]):
+                if line.strip():
                     line_y = dialogue_y + 10 + i * line_height
                     line_surface = self.dialogue_font.render(line, True, WHITE)
                     self.screen.blit(line_surface, (dialogue_rect.x + 10, line_y))
@@ -658,17 +693,20 @@ class TownState:
         pygame.draw.rect(self.screen, BLACK, menu_rect)
         pygame.draw.rect(self.screen, self.current_npc.color, menu_rect, 3)
         
+        # Header
         header_text = f"Talking to {self.current_npc.name}"
         header_surface = self.font.render(header_text, True, WHITE)
         header_rect = header_surface.get_rect(center=(SCREEN_WIDTH // 2, menu_y + 20))
         self.screen.blit(header_surface, header_rect)
         
+        # Dialogue choices
         choice_y_start = menu_y + 50
         choice_spacing = 35
         
         for i, choice in enumerate(self.dialogue_choices):
             choice_y = choice_y_start + i * choice_spacing
             
+            # Highlight selected choice
             if i == self.selected_choice:
                 choice_bg = pygame.Rect(menu_x + 10, choice_y - 5, menu_width - 20, 25)
                 pygame.draw.rect(self.screen, self.current_npc.color, choice_bg)
@@ -680,6 +718,7 @@ class TownState:
             choice_surface = self.dialogue_font.render(choice_text, True, choice_color)
             self.screen.blit(choice_surface, (menu_x + 15, choice_y))
         
+        # Instructions
         instruction_text = "Use Arrow Keys to select • Enter or E to choose"
         instruction_surface = pygame.font.Font(None, 18).render(instruction_text, True, GRAY)
         instruction_rect = instruction_surface.get_rect(center=(SCREEN_WIDTH // 2, menu_y + menu_height - 15))
@@ -687,31 +726,33 @@ class TownState:
         
     def draw_minimap(self):
         """Draw a compact minimap"""
-        map_scale = 8  
+        map_scale = 8
         map_size = 120
         map_x = SCREEN_WIDTH - map_size - 10
         map_y = 10
         
+        # Minimap background
         pygame.draw.rect(self.screen, DARK_GRAY, (map_x, map_y, map_size, map_size))
         pygame.draw.rect(self.screen, WHITE, (map_x, map_y, map_size, map_size), 2)
         
+        # Draw map tiles
         for y in range(self.town_map.height):
             for x in range(self.town_map.width):
                 tile_type = self.town_map.get_tile(x, y)
                 
-                if tile_type != 0:  
+                if tile_type != 0:
                     color = WHITE
-                    if tile_type == 1: 
+                    if tile_type == 1:
                         color = BROWN
-                    elif tile_type == 2: 
+                    elif tile_type == 2:
                         color = GRAY
-                    elif tile_type == 3: 
+                    elif tile_type == 3:
                         color = DARK_RED
-                    elif tile_type == 4: 
+                    elif tile_type == 4:
                         color = PURPLE
-                    elif tile_type == 5: 
+                    elif tile_type == 5:
                         color = WHITE
-                    elif tile_type == 6:  
+                    elif tile_type == 6:
                         color = GOLD
                         
                     tile_x = map_x + x * map_scale
@@ -719,6 +760,7 @@ class TownState:
                     pygame.draw.rect(self.screen, color, 
                                    (tile_x, tile_y, map_scale, map_scale))
                     
+        # Draw NPCs on minimap
         for npc in self.npcs:
             npc_map_x = int(map_x + (npc.x / TILE_SIZE) * map_scale)
             npc_map_y = int(map_y + (npc.y / TILE_SIZE) * map_scale)
@@ -727,6 +769,7 @@ class TownState:
                 map_y <= npc_map_y <= map_y + map_size):
                 pygame.draw.circle(self.screen, npc.color, (npc_map_x, npc_map_y), 2)
                     
+        # Draw player on minimap
         player_map_x = int(self.player.x // TILE_SIZE)
         player_map_y = int(self.player.y // TILE_SIZE)
         
@@ -736,6 +779,7 @@ class TownState:
             
             pygame.draw.circle(self.screen, YELLOW, (player_x, player_y), 3)
             
+            # Draw direction indicator
             end_x = player_x + int(math.cos(self.player.angle) * 10)
             end_y = player_y + int(math.sin(self.player.angle) * 10)
             pygame.draw.line(self.screen, YELLOW, (player_x, player_y), (end_x, end_y), 2)

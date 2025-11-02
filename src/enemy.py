@@ -17,6 +17,7 @@ class Enemy:
                 EnemyType.DEMON: pygame.image.load("../assets/textures/enemies/demon.png"),
             }
         except pygame.error:
+            # Create colored placeholder sprites if images fail to load
             cls.enemy_images = {}
             colors = {
                 EnemyType.SKELETON: WHITE,
@@ -34,6 +35,7 @@ class Enemy:
         self.y = y
         self.enemy_type = enemy_type
 
+        # Set stats based on enemy type
         if enemy_type == EnemyType.SKELETON:
             self.health = 75
             self.max_health = 75
@@ -71,6 +73,7 @@ class Enemy:
             self.attack_range = 120 
             self.is_ranged = True
 
+        # Load sprite
         if not Enemy.enemy_images:
             Enemy.load_images()
             
@@ -79,10 +82,12 @@ class Enemy:
         )
         self.rect = self.image.get_rect(center=(self.x, self.y))
 
+        # Combat timers
         self.last_attack = 0
         self.attack_cooldown = 2000  
         self.alive = True
         
+        # Projectile system
         self.projectiles = []
         self.projectile_speed = 200
 
@@ -95,6 +100,7 @@ class Enemy:
         dy = player.y - self.y
         distance = math.sqrt(dx * dx + dy * dy)
 
+        # Ranged enemy behavior
         if self.is_ranged:
             if distance > self.attack_range:
                 self.move_towards_player(player, dt, distance, dx, dy)
@@ -103,6 +109,7 @@ class Enemy:
             
             if distance <= self.attack_range and current_time - self.last_attack > self.attack_cooldown:
                 self.ranged_attack(player, current_time)
+        # Melee enemy behavior
         else:
             if distance > self.attack_range:
                 self.move_towards_player(player, dt, distance, dx, dy)
@@ -168,9 +175,11 @@ class Enemy:
                 self.projectiles.remove(projectile)
                 continue
                 
+            # Move projectile
             projectile['x'] += math.cos(projectile['angle']) * self.projectile_speed * dt
             projectile['y'] += math.sin(projectile['angle']) * self.projectile_speed * dt
             
+            # Check collision with player
             dx = projectile['x'] - player.x
             dy = projectile['y'] - player.y
             distance = math.sqrt(dx * dx + dy * dy)
@@ -183,24 +192,27 @@ class Enemy:
                 projectile['alive'] = False
 
     def check_collision(self, x: float, y: float) -> bool:
-        """Collision check with bounds"""
+        """Collision check with arena bounds"""
         map_x = int(x // TILE_SIZE)
         map_y = int(y // TILE_SIZE)
 
         if map_x < 0 or map_x >= 20 or map_y < 0 or map_y >= 20:
             return True
 
+        # Check circular arena boundary
         center_x, center_y = 10, 10
         distance = math.sqrt((map_x - center_x) ** 2 + (map_y - center_y) ** 2)
 
         return distance > 8
 
     def take_damage(self, damage):
+        """Take damage and check if enemy dies"""
         self.health -= damage
         if self.health <= 0:
             self.alive = False
 
     def get_distance_to(self, x, y):
+        """Calculate distance to a point"""
         dx = self.x - x
         dy = self.y - y
         return math.sqrt(dx * dx + dy * dy)

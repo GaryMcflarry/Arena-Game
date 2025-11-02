@@ -11,38 +11,41 @@ class Player:
         self.base_speed = 120
         self.rot_speed = 3.0
         
-        self.health = 60000000000
+        # Health and mana
+        self.health = 1000
         self.max_health = 6000000000
-        self.mana = 60000
+        self.mana = 100
         self.max_mana = 60000
-        self.mana_regen = 20  
+        self.mana_regen = 20
         
-        self.z = 0  
+        # Jump mechanics
+        self.z = 0
         self.z_velocity = 0
-        self.gravity = 800  
-        self.jump_power = 250  
+        self.gravity = 800
+        self.jump_power = 250
         self.is_jumping = False
         self.can_jump = True
         
         self.mouse_sensitivity = 0.003
         
-        self.gold = 1000000 
+        self.gold = 1000
         
-        self.weapon_level = 1 
-        self.armor_level = 1   
-        self.spell_level = 1   
+        # Upgrade levels
+        self.weapon_level = 1
+        self.armor_level = 1
+        self.spell_level = 1
         
+        # Spell system
         self.current_spell = "fireball"
-        self.known_spells = ["fireball"] 
+        self.known_spells = ["fireball"]
         self.spell_costs = {
             "fireball": 20,
-            "lightning": 15, 
+            "lightning": 15,
             "ice": 25,
             "heal": 30,
-            "shield": 40,
-            "teleport": 50
         }
         
+        # Progression tracking
         self.total_score = 0
         self.highest_wave = 0
         
@@ -62,11 +65,11 @@ class Player:
         
     def get_armor_defense(self):
         """Get damage reduction based on armor level"""
-        return (self.armor_level - 1) * 0.1 
+        return (self.armor_level - 1) * 0.1
         
     def get_spell_damage_multiplier(self):
         """Get spell damage multiplier based on spell level"""
-        return 1.0 + (self.spell_level - 1) * 0.25 
+        return 1.0 + (self.spell_level - 1) * 0.25
         
     def get_max_health(self):
         """Get max health including armor bonus"""
@@ -111,13 +114,16 @@ class Player:
 
     def update(self, dt):
         """Update player state"""
+        # Regenerate mana
         max_mana = self.get_max_mana()
         self.mana = min(max_mana, self.mana + self.mana_regen * dt)
         
+        # Handle jumping physics
         if self.is_jumping or self.z > 0:
             self.z_velocity -= self.gravity * dt
             self.z += self.z_velocity * dt
             
+            # Land on ground
             if self.z <= 0:
                 self.z = 0
                 self.z_velocity = 0
@@ -134,12 +140,14 @@ class Player:
         sin_a = math.sin(self.angle)
         cos_a = math.cos(self.angle)
         
+        # Sprint modifier
         current_speed = self.base_speed
         if keys[pygame.K_LSHIFT]:
             current_speed *= 1.5
         
         dx, dy = 0, 0
         
+        # WASD movement
         if keys[pygame.K_w]:
             dx += cos_a * current_speed * dt
             dy += sin_a * current_speed * dt
@@ -153,6 +161,7 @@ class Player:
             dx -= sin_a * current_speed * dt
             dy += cos_a * current_speed * dt
         
+        # Apply movement with collision checking
         if collision_map:
             new_x = self.x + dx
             if not self.check_collision(new_x, self.y, collision_map, map_width, map_height):
@@ -165,11 +174,13 @@ class Player:
             self.x += dx
             self.y += dy
         
+        # Arrow key rotation
         if keys[pygame.K_LEFT]:
             self.angle -= self.rot_speed * dt
         if keys[pygame.K_RIGHT]:
             self.angle += self.rot_speed * dt
         
+        # Jumping
         if keys[pygame.K_SPACE] and not self.is_jumping:
             self.jump()
         
@@ -178,6 +189,7 @@ class Player:
     def check_collision(self, x: float, y: float, collision_map, map_width, map_height) -> bool:
         """Check collision with map boundaries and walls"""
         buffer = 8
+        # Check collision at player's corners
         points = [
             (x - buffer, y - buffer),
             (x + buffer, y - buffer),
@@ -189,9 +201,11 @@ class Player:
             map_x = int(px // TILE_SIZE)
             map_y = int(py // TILE_SIZE)
             
+            # Check map bounds
             if map_x < 0 or map_x >= map_width or map_y < 0 or map_y >= map_height:
                 return True
             
+            # Check wall collision
             if collision_map[map_y][map_x] != 0:
                 return True
         

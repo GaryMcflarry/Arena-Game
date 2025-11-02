@@ -10,12 +10,13 @@ class Spell:
         self.alive = True
         self.sound_manager = sound_manager
         
+        # Set spell properties based on type
         if spell_type == "fireball":
             self.speed = 300
-            self.damage = 600
+            self.damage = 100
             self.color = ORANGE
             self.size = 8
-            self.trail_particles = []  
+            self.trail_particles = []
         elif spell_type == "lightning":
             self.speed = 500
             self.damage = 40
@@ -29,40 +30,44 @@ class Spell:
             self.size = 10
             self.trail_particles = []
         elif spell_type == "heal":
-            self.speed = 0  
-            self.damage = -50  
+            self.speed = 0  # Instant cast
+            self.damage = -50  # Negative = healing
             self.color = GREEN
             self.size = 15
             self.trail_particles = []
         elif spell_type == "shield":
-            self.speed = 0 
+            self.speed = 0  # Instant cast
             self.damage = 0
             self.color = PURPLE
             self.size = 20
             self.trail_particles = []
         elif spell_type == "teleport":
-            self.speed = 0  
+            self.speed = 0  # Instant cast
             self.damage = 0
-            self.color = (255, 0, 255)  
+            self.color = (255, 0, 255)
             self.size = 12
             self.trail_particles = []
         
+        # Particle trail system
         self.particle_timer = 0
-        self.particle_spawn_rate = 50 
+        self.particle_spawn_rate = 50
             
     def update(self, dt, collision_map=None, map_width=0, map_height=0):
         """Update spell position and check collisions"""
         if not self.alive:
             return
             
+        # Instant cast spells expire immediately
         if self.speed == 0:
-            self.alive = False 
+            self.alive = False
             return
             
+        # Move spell
         old_x, old_y = self.x, self.y
         self.x += math.cos(self.angle) * self.speed * dt
         self.y += math.sin(self.angle) * self.speed * dt
         
+        # Add trail particles
         self.particle_timer += dt * 1000
         if self.particle_timer > self.particle_spawn_rate:
             self.add_trail_particle(old_x, old_y)
@@ -70,6 +75,7 @@ class Spell:
         
         self.update_particles(dt)
         
+        # Check wall collisions
         if collision_map:
             map_x = int(self.x // TILE_SIZE)
             map_y = int(self.y // TILE_SIZE)
@@ -88,21 +94,23 @@ class Spell:
         particle = {
             'x': x + random.uniform(-2, 2),
             'y': y + random.uniform(-2, 2),
-            'life': 1.0, 
+            'life': 1.0,
             'size': random.uniform(2, 4),
             'color': self.color
         }
         self.trail_particles.append(particle)
         
+        # Limit trail length
         if len(self.trail_particles) > 10:
             self.trail_particles.pop(0)
     
     def update_particles(self, dt):
         """Update trail particles"""
         for particle in self.trail_particles[:]:
-            particle['life'] -= dt * 3  
-            particle['size'] *= 0.98 
+            particle['life'] -= dt * 3
+            particle['size'] *= 0.98
             
+            # Remove dead particles
             if particle['life'] <= 0:
                 self.trail_particles.remove(particle)
     
@@ -112,6 +120,7 @@ class Spell:
         
         for particle in self.trail_particles:
             if particle['life'] > 0:
+                # Calculate alpha based on particle life
                 alpha = int(255 * particle['life'])
                 size = max(1, int(particle['size']))
                 
@@ -119,6 +128,7 @@ class Spell:
                 particle_surface.set_alpha(alpha)
                 particle_color = particle['color']
                 
+                # Adjust brightness based on life
                 brightness = particle['life']
                 adjusted_color = tuple(int(c * brightness) for c in particle_color)
                 
@@ -129,6 +139,6 @@ class Spell:
         """Called when spell hits a target (enemy/boss)"""
         if self.sound_manager:
             if self.spell_type == "heal":
-                pass
+                pass  # No sound for heal on hit
             else:
                 self.sound_manager.play_sound('spell_hit')

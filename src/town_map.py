@@ -1,9 +1,9 @@
 class TownMap:
     def __init__(self):
-        self.width = 15  
-        self.height = 12  
+        self.width = 15
+        self.height = 12
  
-        
+        # Town layout: 0=walkable, 1=wall, 2=house, 3=weapon shop, 4=magic shop, 5=healer, 6=arena entrance
         self.collision_map = [
             [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
             [1, 3, 3, 0, 2, 2, 0, 6, 6, 0, 2, 2, 0, 4, 1],
@@ -16,9 +16,10 @@ class TownMap:
             [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
             [1, 5, 5, 0, 2, 2, 0, 0, 0, 0, 2, 2, 0, 2, 1],
             [1, 5, 5, 0, 2, 2, 0, 0, 0, 0, 2, 2, 0, 2, 1],
-            [1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1]  
+            [1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1]
         ]
         
+        # Building information
         self.buildings = {
             "weapon_shop": {"name": "Blacksmith", "pos": (1, 1)},
             "magic_shop": {"name": "Mystic Arts", "pos": (13, 1)},
@@ -33,12 +34,12 @@ class TownMap:
         
         if 0 <= x < self.width and 0 <= y < self.height:
             return self.collision_map[y][x]
-        return 1 
+        return 1  # Return wall if out of bounds
         
     def is_walkable(self, x, y):
         """Check if a tile is walkable"""
         tile_type = self.get_tile(x, y)
-        return tile_type == 0  
+        return tile_type == 0
         
     def get_building_at(self, x, y):
         """Get building type at given coordinates"""
